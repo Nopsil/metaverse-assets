@@ -35,7 +35,7 @@ Hard drop, even if the picture is otherwise pretty:
 
 ## How age is judged
 
-Do not mark someone a minor from body proportions, a large-eyed face, or a cute costume by themselves. Use the series, the named character, and the setting the artist states.
+Do not mark someone a minor from body proportions, a large-eyed face, or a cute costume by themselves. Use the series, the named character, and the setting the artist states. There is no blanket override that treats a child-coded or underage-coded fictional character as an adult.
 
 - A child-coded or school-coded character is out even when the drawing looks grown.
 - A clearly adult character (canonical adult, お姉さん, 人妻, 熟女, stated age 21 or older) stays in the pool when the only issue is a cute style. 貧乳, スレンダー, 細身, and 華奢 stay too. つるぺた still drops: it is the child-coded undeveloped tag, not an adult petite build.
