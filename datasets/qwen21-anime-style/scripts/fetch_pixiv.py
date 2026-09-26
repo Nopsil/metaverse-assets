@@ -48,18 +48,38 @@ MIN_LONG = 1024
 MAX_PAGES = 3
 
 
-def search_url(word: str, page: int, mode: str) -> str:
+def search_url(
+    word: str,
+    page: int,
+    mode: str,
+    *,
+    order: str = "date_d",
+    start_date: str = "",
+    end_date: str = "",
+    artwork_type: str = "illustrations",
+    min_bookmarks: int = 0,
+) -> str:
+    """Ajax illustration search. Defaults stay the public safe-mode call.
+
+    Hot R-18 collection passes order=popular_d, type=illust, scd/ecd, and blt.
+    """
     params = {
         "word": word,
-        "order": "date_d",
+        "order": order,
         "mode": mode,
         "p": page,
         "csw": 0,
         "s_mode": "s_tag",
-        "type": "illustrations",
+        "type": artwork_type,
         "lang": "en",
         "wlt": 1024,
     }
+    if start_date:
+        params["scd"] = start_date
+    if end_date:
+        params["ecd"] = end_date
+    if min_bookmarks > 0:
+        params["blt"] = min_bookmarks
     return (
         "https://www.pixiv.net/ajax/search/illustrations/"
         f"{urllib.parse.quote(word)}?{urllib.parse.urlencode(params)}"

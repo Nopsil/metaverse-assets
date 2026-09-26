@@ -13,6 +13,7 @@ catalog/civitai_adult_pending.csv
 catalog/_originals/
 catalog/_originals_anatomy/
 catalog/_originals_civitai/
+catalog/_originals_quarantine/
 images/
 train/data/
 train/output/

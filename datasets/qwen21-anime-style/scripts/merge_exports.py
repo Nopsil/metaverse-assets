@@ -18,6 +18,7 @@ from collections import Counter
 from pathlib import Path
 
 from build_catalog import CSV_FIELDS, write_outputs
+from pixiv_home import quarantine_low_bookmark_pixiv
 from pixiv_urls import parse_artwork_url, refs_from_text
 from safety import has_person_signal, screen
 
@@ -81,6 +82,10 @@ def _stub(source: str, artwork_id: str, url: str, *, title: str = "", tags: list
             "model_name",
             "collected_via",
             "user_id",
+            "create_date",
+            "bookmark_count",
+            "body_bucket",
+            "pool",
         ):
             if extra.get(key) not in (None, "", []):
                 row[key] = extra[key]
@@ -132,10 +137,14 @@ def screen_incoming(row: dict) -> tuple[dict | None, str]:
     merged["visual_review"] = "pending"
     if merged.get("rating") not in {"all-ages", "adult"}:
         merged["rating"] = "unreviewed"
-    merged["keep_reason"] = (
-        "Imported export passed the metadata screen. "
-        "Full-size human review is required before download or training."
-    )
+    hot_reason = str(row.get("keep_reason") or "")
+    if str(row.get("collected_via") or "") == "pixiv_popular_date_window" and hot_reason:
+        merged["keep_reason"] = hot_reason[:500]
+    else:
+        merged["keep_reason"] = (
+            "Imported export passed the metadata screen. "
+            "Full-size human review is required before download or training."
+        )
     return merged, "pass"
 
 
@@ -223,6 +232,14 @@ def main() -> None:
         action="store_true",
         help="Also write catalog/style_candidates.jsonl and style_candidates.csv.",
     )
+    parser.add_argument(
+        "--quarantine-pixiv-below",
+        type=int,
+        default=0,
+        help="Mark older Pixiv rows under this bookmark count as visual_review=quarantine.",
+    )
+    parser.add_argument("--originals", type=Path, default=CATALOG / "_originals")
+    parser.add_argument("--quarantine-dir", type=Path, default=CATALOG / "_originals_quarantine")
     args = parser.parse_args()
     if not args.imports:
         parser.error("Pass at least one --import file (jsonl, csv, or a URL list).")
@@ -232,6 +249,16 @@ def main() -> None:
     for path in args.imports:
         incoming.extend(load_export(path))
     merged, stats = merge_rows(base, incoming)
+    quarantine_stats = {}
+    if args.quarantine_pixiv_below:
+        quarantine_stats = dict(
+            quarantine_low_bookmark_pixiv(
+                merged,
+                min_bookmarks=args.quarantine_pixiv_below,
+                originals_dir=args.originals if args.originals.exists() else None,
+                quarantine_dir=args.quarantine_dir,
+            )
+        )
     csv_path = args.out.with_suffix(".csv")
     write_outputs(merged, args.out, csv_path)
     if args.apply:
@@ -245,6 +272,7 @@ def main() -> None:
         "by_source": dict(Counter(str(row.get("source") or "") for row in merged)),
         "by_rating": dict(Counter(str(row.get("rating") or "") for row in merged)),
         "stats": dict(stats),
+        "quarantine": quarantine_stats,
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

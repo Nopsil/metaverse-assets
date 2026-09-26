@@ -295,6 +295,148 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(blocked, [])
 
 
+class HotSearchTest(unittest.TestCase):
+    def test_popular_url_uses_padded_dates_and_bookmark_floor(self):
+        from pixiv_home import canonical_order, hot_search_url, in_date_window
+
+        self.assertEqual(canonical_order("popular"), "popular_d")
+        self.assertEqual(canonical_order("人気"), "popular_d")
+        url = hot_search_url(
+            "お姉さん オリジナル",
+            1,
+            start_date="2026-04-01",
+            end_date="2026-10-31",
+            order="popular",
+            min_bookmarks=1000,
+        )
+        self.assertIn("order=popular_d", url)
+        self.assertIn("mode=r18", url)
+        self.assertIn("type=illust", url)
+        self.assertIn("scd=2026-03-31", url)
+        self.assertIn("ecd=2026-11-01", url)
+        self.assertIn("blt=1000", url)
+        self.assertTrue(in_date_window("2026-04-01", "2026-04-01", "2026-10-31"))
+        self.assertTrue(in_date_window("2026-10-31", "2026-04-01", "2026-10-31"))
+        self.assertFalse(in_date_window("2026-03-31", "2026-04-01", "2026-10-31"))
+        self.assertFalse(in_date_window("2026-11-01", "2026-04-01", "2026-10-31"))
+
+    def test_hot_search_keeps_diverse_adults_inside_the_window(self):
+        from pixiv_home import hot_query_texts, iter_hot_r18_search, select_hot_rows, validate_queries
+
+        validate_queries(hot_query_texts())
+        with self.assertRaises(RuntimeError):
+            validate_queries(["ロリ オリジナル"])
+
+        items = [
+            {"id": "1", "title": "a", "xRestrict": 1, "illustType": 0, "bookmarkCount": 5000,
+             "createDate": "2026-04-01T00:00:00+09:00", "tags": ["巨乳", "女性", "オリジナル"], "userId": "1"},
+            {"id": "2", "title": "b", "xRestrict": 0, "illustType": 0, "bookmarkCount": 9000,
+             "createDate": "2026-05-01T00:00:00+09:00", "tags": ["お姉さん", "オリジナル"], "userId": "2"},
+            {"id": "3", "title": "c", "xRestrict": 1, "illustType": 0, "bookmarkCount": 200,
+             "createDate": "2026-05-02T00:00:00+09:00", "tags": ["お姉さん", "オリジナル"], "userId": "3"},
+            {"id": "4", "title": "d", "xRestrict": 1, "illustType": 0, "bookmarkCount": 1800,
+             "createDate": "2026-03-31T00:00:00+09:00", "tags": ["スレンダー", "女性", "オリジナル"], "userId": "4"},
+            {"id": "5", "title": "e", "xRestrict": 1, "illustType": 0, "bookmarkCount": 2200,
+             "createDate": "2026-10-31T00:00:00+09:00", "tags": ["貧乳", "お姉さん", "オリジナル"], "userId": "5"},
+            {"id": "6", "title": "ラフ", "xRestrict": 1, "illustType": 0, "bookmarkCount": 4000,
+             "createDate": "2026-06-01T00:00:00+09:00", "tags": ["落書き", "お姉さん"], "userId": "6"},
+            {"id": "7", "title": "f", "xRestrict": 1, "illustType": 2, "bookmarkCount": 3000,
+             "createDate": "2026-06-01T00:00:00+09:00", "tags": ["お姉さん", "オリジナル"], "userId": "7"},
+            {"id": "8", "title": "合法ロリ", "xRestrict": 1, "illustType": 0, "bookmarkCount": 8000,
+             "createDate": "2026-07-01T00:00:00+09:00", "tags": ["ロリ", "オリジナル"], "userId": "8"},
+        ]
+
+        def fetch(url: str) -> dict:
+            import urllib.parse
+
+            if urllib.parse.quote("貧乳") in url:
+                data = [items[4]]
+            elif urllib.parse.quote("巨乳") in url:
+                data = [items[0], items[1], items[2], items[3], items[5], items[6], items[7]]
+            else:
+                data = []
+            return {"error": False, "body": {"illust": {"data": data}}}
+
+        groups, notes = iter_hot_r18_search(
+            fetch, pages=1, start_date="2026-04-01", end_date="2026-10-31", order="popular", min_bookmarks=1000
+        )
+        kept_ids = [item["id"] for bucket in groups.values() for item in bucket]
+        self.assertIn("1", kept_ids)
+        self.assertIn("5", kept_ids)
+        self.assertNotIn("2", kept_ids)
+        self.assertNotIn("3", kept_ids)
+        self.assertNotIn("4", kept_ids)
+        self.assertNotIn("6", kept_ids)
+        self.assertNotIn("7", kept_ids)
+        self.assertNotIn("8", kept_ids)
+        self.assertEqual(notes["order_sent"], "popular_d")
+        self.assertGreaterEqual(notes["search_bookmark_summary"]["max"], 5000)
+
+        rows = []
+        for bucket, stubs in groups.items():
+            for stub in stubs:
+                rows.append({
+                    "id": stub["id"],
+                    "body_bucket": bucket,
+                    "bookmark_count": stub["bookmarkCount"],
+                    "user_id": stub["userId"],
+                    "rating": "adult",
+                })
+        for index in range(6):
+            rows.append({
+                "id": f"9{index}",
+                "body_bucket": "curvy",
+                "bookmark_count": 4000 - index,
+                "user_id": f"c{index}",
+                "rating": "adult",
+            })
+        chosen = select_hot_rows(rows, limit=8, per_bucket=3)
+        buckets = [row["body_bucket"] for row in chosen]
+        self.assertIn("flat", buckets)
+        self.assertLessEqual(buckets.count("curvy"), 7)
+        self.assertLessEqual(len(chosen), 8)
+
+    def test_quarantine_moves_weak_pixiv_files_and_keeps_hot_rows(self):
+        import tempfile
+        from pathlib import Path
+
+        from pixiv_home import quarantine_low_bookmark_pixiv
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            originals = root / "orig"
+            quarantine = root / "q"
+            originals.mkdir()
+            (originals / "10_p0.jpg").write_bytes(b"weak")
+            (originals / "11_p0.jpg").write_bytes(b"hot")
+            rows = [
+                {"source": "pixiv", "id": "10", "quality": 40, "visual_review": "pending", "keep_reason": "old"},
+                {"source": "pixiv", "id": "11", "quality": 50, "pool": "hot", "visual_review": "pending"},
+                {"source": "pixiv", "id": "12", "quality": 2500, "visual_review": "thumbnail_pass"},
+                {"source": "civitai", "id": "13", "quality": 100, "visual_review": "pending"},
+            ]
+            stats = quarantine_low_bookmark_pixiv(
+                rows, min_bookmarks=1000, originals_dir=originals, quarantine_dir=quarantine
+            )
+            self.assertEqual(stats["quarantined"], 1)
+            self.assertEqual(stats["files_moved"], 1)
+            self.assertTrue((quarantine / "10_p0.jpg").exists())
+            self.assertTrue((originals / "11_p0.jpg").exists())
+        self.assertEqual(rows[0]["visual_review"], "quarantine")
+        self.assertEqual(rows[1]["pool"], "hot")
+        self.assertEqual(rows[2]["visual_review"], "thumbnail_pass")
+        self.assertEqual(rows[3]["visual_review"], "pending")
+
+    def test_downloader_skips_quarantine(self):
+        from download_pixiv_originals import pixiv_targets
+
+        targets = pixiv_targets([
+            {"source": "pixiv", "id": "10", "url": "https://www.pixiv.net/artworks/10", "visual_review": "quarantine"},
+            {"source": "pixiv", "id": "11", "url": "https://www.pixiv.net/artworks/11", "visual_review": "pending"},
+        ])
+        self.assertEqual([item["id"] for item in targets], ["11"])
+
+
 class CliTest(unittest.TestCase):
     def test_self_check_and_non_windows_guard(self):
         checked = subprocess.run(

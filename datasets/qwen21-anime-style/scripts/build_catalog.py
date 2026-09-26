@@ -36,6 +36,9 @@ CSV_FIELDS = [
     "quality",
     "visual_review",
     "collected_via",
+    "create_date",
+    "body_bucket",
+    "pool",
 ]
 
 

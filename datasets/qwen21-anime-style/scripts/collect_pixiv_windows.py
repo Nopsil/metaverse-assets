@@ -14,19 +14,31 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
 from chrome_profile import default_dedicated_profile, validate_proxy
 from pixiv_browser import open_pixiv, require_windows
+from download_pixiv_originals import profile_in_use
 from pixiv_home import (
     ADULT_R18_QUERIES,
+    HOT_BODY_QUERIES,
+    HOT_KEEP_END,
+    HOT_KEEP_START,
     PETITE_ADULT_QUERIES,
+    bookmark_count,
+    bookmark_summary,
     collect_rows_from_stubs,
+    create_day,
+    hot_query_texts,
+    in_date_window,
     iter_bookmark_works,
+    iter_hot_r18_search,
     iter_r18_search,
     pixiv_block_reason,
     queries_for_body,
+    select_hot_rows,
     validate_queries,
 )
 
@@ -70,28 +82,33 @@ def detect_user_id(page) -> str:
 
 def make_fetch(page):
     def fetch_json(url: str) -> dict:
-        result = page.evaluate(
-            """async (url) => {
-                const res = await fetch(url, {
-                    credentials: "include",
-                    headers: { "Accept": "application/json" }
-                });
-                const text = await res.text();
-                return { status: res.status, text: text.slice(0, 1500000) };
-            }""",
-            url,
-        )
-        status = int((result or {}).get("status") or 0)
-        text = (result or {}).get("text") or ""
-        reason = pixiv_block_reason(status, text)
-        if reason:
-            _exit(
-                "Pixiv refused this network (" + reason + "). "
-                "Run this on your home connection. A US datacenter IP is often blocked."
+        last_status = 0
+        for attempt in range(5):
+            result = page.evaluate(
+                """async (url) => {
+                    const res = await fetch(url, {
+                        credentials: "include",
+                        headers: { "Accept": "application/json" }
+                    });
+                    const text = await res.text();
+                    return { status: res.status, text: text.slice(0, 1500000) };
+                }""",
+                url,
             )
-        if status != 200:
-            raise RuntimeError(f"Pixiv HTTP {status}")
-        return json.loads(text)
+            last_status = int((result or {}).get("status") or 0)
+            text = (result or {}).get("text") or ""
+            reason = pixiv_block_reason(last_status, text)
+            if reason:
+                _exit(
+                    "Pixiv refused this network (" + reason + "). "
+                    "Run this on your home connection. A US datacenter IP is often blocked."
+                )
+            if last_status == 200:
+                return json.loads(text)
+            if last_status not in {429, 500, 502, 503} or attempt == 4:
+                break
+            time.sleep(2 ** attempt)
+        raise RuntimeError(f"Pixiv HTTP {last_status}")
 
     return fetch_json
 
@@ -125,6 +142,18 @@ def scrape(page, args) -> tuple[list[dict], dict]:
         notes["r18_stubs"] = len(found)
         notes["r18_masked_queries"] = masked
         stubs.extend(found)
+    if args.mode == "hot":
+        groups, search_notes = iter_hot_r18_search(
+            fetch_json,
+            pages=args.pages,
+            start_date=args.start_date,
+            end_date=args.end_date,
+            order=args.order,
+            min_bookmarks=args.min_bookmarks,
+        )
+        notes.update(search_notes)
+        stubs = _hot_detail_stubs(groups, detail_limit=max(args.limit * 4, args.limit))
+        notes["detail_stubs"] = len(stubs)
     rows = collect_rows_from_stubs(
         stubs,
         fetch_json,
@@ -132,6 +161,8 @@ def scrape(page, args) -> tuple[list[dict], dict]:
         dropped=dropped,
         delay_s=0.35,
     )
+    if args.mode == "hot":
+        rows = _finish_hot_rows(rows, stubs, args, dropped, notes)
     notes["dropped"] = dict(dropped)
     notes["rows"] = len(rows)
     if notes.get("r18_masked_queries") and not notes.get("r18_stubs"):
@@ -142,7 +173,94 @@ def scrape(page, args) -> tuple[list[dict], dict]:
     return rows, notes
 
 
+def _hot_detail_stubs(groups: dict[str, list[dict]], *, detail_limit: int) -> list[dict]:
+    ordered = {
+        bucket: sorted(items, key=lambda item: bookmark_count(item) or 0, reverse=True)
+        for bucket, items in groups.items()
+    }
+    picked: list[dict] = []
+    seen: set[str] = set()
+    index = {bucket: 0 for bucket in ordered}
+    while len(picked) < detail_limit:
+        progressed = False
+        for bucket, items in ordered.items():
+            cursor = index[bucket]
+            if cursor >= len(items):
+                continue
+            index[bucket] = cursor + 1
+            item = items[cursor]
+            artwork_id = str(item.get("id") or "")
+            if not artwork_id or artwork_id in seen:
+                continue
+            seen.add(artwork_id)
+            picked.append(item)
+            progressed = True
+            if len(picked) >= detail_limit:
+                break
+        if not progressed:
+            break
+    return picked
+
+
+def _finish_hot_rows(rows, stubs, args, dropped: Counter, notes: dict) -> list[dict]:
+    meta = {str(stub.get("id") or ""): stub for stub in stubs}
+    for row in rows:
+        stub = meta.get(str(row.get("id") or ""), {})
+        row["body_bucket"] = str(stub.get("_body_bucket") or "")
+        row["pool"] = "hot"
+        row["collected_via"] = "pixiv_popular_date_window"
+        if not row.get("create_date"):
+            row["create_date"] = create_day(str(stub.get("createDate") or ""))
+        counted = int(row.get("bookmark_count") or 0)
+        stub_count = bookmark_count(stub) or 0
+        if stub_count > counted:
+            row["bookmark_count"] = stub_count
+            row["quality"] = stub_count
+        row["keep_reason"] = (
+            f"Popular R-18 search {args.start_date}..{args.end_date} "
+            f"({row.get('body_bucket')}, {row.get('bookmark_count')} bookmarks). "
+            "Metadata screen passed. Full-size review is still required before training."
+        )
+    notes["detail_bookmark_summary"] = bookmark_summary(
+        [int(row.get("bookmark_count") or 0) for row in rows]
+    )
+    filtered = []
+    for row in rows:
+        day = str(row.get("create_date") or "")
+        if not in_date_window(day, args.start_date, args.end_date):
+            dropped["outside_date"] += 1
+            continue
+        if row.get("rating") != "adult":
+            dropped["not_adult"] += 1
+            continue
+        if int(row.get("bookmark_count") or 0) < args.min_bookmarks:
+            dropped["low_bookmarks"] += 1
+            continue
+        filtered.append(row)
+    per_bucket = max(6, args.limit // 5)
+    chosen = select_hot_rows(filtered, limit=args.limit, per_bucket=per_bucket)
+    notes["kept_bookmarks"] = bookmark_summary(
+        [int(row.get("bookmark_count") or 0) for row in chosen]
+    )
+    notes["kept_buckets"] = dict(Counter(str(row.get("body_bucket") or "") for row in chosen))
+    notes["sample_ids"] = [
+        {
+            "id": row.get("id"),
+            "bookmarks": row.get("bookmark_count"),
+            "bucket": row.get("body_bucket"),
+            "create_date": row.get("create_date"),
+        }
+        for row in chosen[:8]
+    ]
+    return chosen
+
+
 def run_browser(profile: Path, proxy: str, args) -> tuple[list[dict], dict]:
+    if profile_in_use(profile):
+        _exit(
+            "The dedicated Chrome profile is already open. Close that window and rerun. "
+            "Do not use the system Chrome profile."
+        )
     playwright, context = open_pixiv(profile, proxy, REPO_ROOT, headless=args.headless)
     page = context.pages[0] if context.pages else context.new_page()
     try:
@@ -189,12 +307,25 @@ def main() -> None:
     )
     parser.add_argument("--proxy", default="", help="Local proxy, for example http://127.0.0.1:7890.")
     parser.add_argument("--user-id", default="", help="Pixiv numeric user id, if the page does not show one.")
-    parser.add_argument("--mode", choices=("bookmarks", "r18", "both"), default="both")
+    parser.add_argument("--mode", choices=("bookmarks", "r18", "both", "hot"), default="both")
     parser.add_argument(
         "--body",
         choices=("all", "mature", "petite"),
         default="all",
         help="R-18 search set. petite is slim/flat adult originals. mature is the older tall/voluptuous allowlist.",
+    )
+    parser.add_argument(
+        "--order",
+        default="popular",
+        help="Hot mode sort. popular and 人気 are sent as Pixiv order=popular_d.",
+    )
+    parser.add_argument("--start-date", default=HOT_KEEP_START, help="Inclusive keep-window start, YYYY-MM-DD.")
+    parser.add_argument("--end-date", default=HOT_KEEP_END, help="Inclusive keep-window end, YYYY-MM-DD.")
+    parser.add_argument(
+        "--min-bookmarks",
+        type=int,
+        default=1000,
+        help="Hot mode bookmark floor. Sent as blt when Pixiv accepts it.",
     )
     parser.add_argument("--limit", type=int, default=60)
     parser.add_argument("--pages", type=int, default=2, help="R-18 search pages per query.")
@@ -211,10 +342,14 @@ def main() -> None:
     if args.self_check:
         validate_queries(ADULT_R18_QUERIES)
         validate_queries(PETITE_ADULT_QUERIES)
+        validate_queries(hot_query_texts())
         print(json.dumps({
             "self_check": "ok",
             "mature_queries": len(ADULT_R18_QUERIES),
             "petite_queries": len(PETITE_ADULT_QUERIES),
+            "hot_queries": len(HOT_BODY_QUERIES),
+            "hot_keep": [HOT_KEEP_START, HOT_KEEP_END],
+            "hot_order": "popular_d",
         }))
         return
 

@@ -12,6 +12,7 @@ The catalog is a candidate pool for later training on **official Qwen Image 2.1*
 - Mix of framing (portrait, half-body, full-body) and costume (fantasy, wafuku, military, casual, witch, knight).
 - Original characters preferred. Named adults are allowed when the design is unmistakably adult and the row is not a dump of one face.
 - Adult body diversity. Keep petite, slim, and flat-chested characters when the setting is adult. Do not fill the pool with only tall, mature, or voluptuous figures. A petite adult is not a minor.
+- New Pixiv R-18 picks use popularity order inside 2026-04-01..2026-10-31 (`--mode hot`). Older Pixiv rows under 1000 bookmarks are `visual_review=quarantine` and are not train-ready.
 - Pixiv: human or unlabeled illustrations. AI-labeled Pixiv works (`aiType == 2`) are skipped so the style target is not only model output. Civitai showcases are AI generations and are marked `ai_generated=yes`.
 
 ## What to drop

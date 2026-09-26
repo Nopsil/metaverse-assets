@@ -34,8 +34,11 @@ The run also writes `catalog/civitai_adult_pending.csv` for adult rows that are 
 ```bat
 py -3 collect_pixiv_windows.py --login --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
+py -3 collect_pixiv_windows.py --mode hot --limit 40 --order popular --start-date 2026-04-01 --end-date 2026-10-31 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
 py -3 download_pixiv_originals.py --catalog ../catalog/style_candidates.jsonl --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
+
+`--mode hot` is the popularity pass: R-18, `order=popular_d`, posting dates 2026-04-01 through 2026-10-31, bookmark floor 1000, body buckets curvy / average / slim / petite / flat. Child-coded characters still drop. `--quarantine-pixiv-below` on `merge_exports.py` marks older low-bookmark Pixiv rows `visual_review=quarantine`.
 
 `--self-check` only validates the adult search words. On Linux or macOS both scripts exit without opening a browser.
 

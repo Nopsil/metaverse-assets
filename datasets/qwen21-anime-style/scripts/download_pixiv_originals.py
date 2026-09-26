@@ -76,6 +76,8 @@ def pixiv_targets(rows: list[dict]) -> list[dict]:
         artwork_id = str(row.get("id") or (ref.id if ref else ""))
         if not artwork_id.isdigit() or artwork_id in seen:
             continue
+        if str(row.get("visual_review") or "") == "quarantine":
+            continue
         if ref is None and source != "pixiv":
             continue
         seen.add(artwork_id)

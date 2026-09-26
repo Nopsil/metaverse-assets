@@ -42,6 +42,25 @@ py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Use
 
 `--mode both` reads public bookmarks and an allowlisted R-18 search (お姉さん / 熟女 / 人妻 / 長身 / 巨乳, original illustrations). Safe-mode stand-ins from a masked R-18 search are not saved. Every title, tag, and description goes through `safety.py`. Output is gitignored `catalog/_pixiv_windows_export.jsonl`.
 
+### Popular R-18 in a date window
+
+```bat
+py -3 collect_pixiv_windows.py --mode hot --limit 40 --pages 2 --order popular --start-date 2026-04-01 --end-date 2026-10-31 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
+```
+
+`--mode hot` searches logged-in R-18 illustrations with `order=popular_d` (the `popular` / 人気 sort). The keep window is 2026-04-01 through 2026-10-31 inclusive. Pixiv's `scd` and `ecd` are after/before, so the request uses 2026-03-31 and 2026-11-01 and the script drops anything outside the inclusive window. `blt` is the bookmark floor when the membership accepts it.
+
+Queries stay on adult fictional looks and are balanced across curvy, average, slim, petite, and flat. Child-coded, school, and under-21 text still drop. Sketches (`ラフ`, `落書き`, `下描き`) and `作画崩壊` drop before the detail fetch. A kept row is `pool=hot` and still needs a full-size look.
+
+Merge, then mark older Pixiv rows under the same bookmark floor so they are not train-ready. That moves their files from `catalog/_originals/` to gitignored `catalog/_originals_quarantine/` when the files are already on disk. High-bookmark rows stay.
+
+```bat
+py -3 merge_exports.py --import ..\catalog\_pixiv_hot_export.jsonl --apply --quarantine-pixiv-below 1000
+py -3 download_pixiv_originals.py --catalog ..\catalog\_pixiv_hot_export.jsonl --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
+```
+
+The downloader skips `visual_review=quarantine`. It still saves `img-original` only.
+
 | Flag | Meaning |
 | --- | --- |
 | `--dedicated-profile` | Persistent Chrome user-data directory. Not the system Chrome profile. |
@@ -50,6 +69,9 @@ py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Use
 | `--user-id 123456` | Numeric id from `https://www.pixiv.net/users/123456`, if the page does not show one. |
 | `--mode bookmarks` | Public bookmarks only. |
 | `--mode r18` | Allowlisted R-18 searches only. |
+| `--mode hot` | Popular R-18 search for 2026-04-01 through 2026-10-31. Sends `order=popular_d` (`--order popular`). |
+| `--start-date` / `--end-date` | Inclusive posting window. Default `2026-04-01` `2026-10-31`. The request pads one day because Pixiv's `scd` / `ecd` are after / before. |
+| `--min-bookmarks` | Hot-mode floor, default 1000, sent as `blt` when the membership allows it. |
 | `--include-private` | Also read private bookmarks. They stay in the gitignored export unless you merge them. |
 | `--include-ai` | Keep works Pixiv has labeled as AI. Off by default. |
 
