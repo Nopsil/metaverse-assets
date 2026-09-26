@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "queried": "お姉さん オリジナル",
+  "mode": "r18",
+  "returned": 60,
+  "xrestrict_positive": 0,
+  "login_required": true,
+  "collected_at": "2026-09-26",
+  "todo": "Pixiv R-18 metadata needs a logged-in session. Do not paste cookies or refresh tokens into this repo. Filter any future ids with scripts/safety.py and a full-size age review before adding them to nsfw_anatomy_scaffold.csv."
+}

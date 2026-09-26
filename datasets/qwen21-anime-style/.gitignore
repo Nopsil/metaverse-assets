@@ -1,0 +1,9 @@
+scripts/.cache/
+scripts/__pycache__/
+downloads/
+thumbs/
+.env
+*.secret
+__pycache__/
+catalog/_*.jsonl
+catalog/_*.summary.json
