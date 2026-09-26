@@ -1,31 +1,24 @@
-"""Collect Pixiv artwork URLs on a Windows PC using a copy of your Chrome profile.
+"""Collect Pixiv artwork URLs on Windows with a dedicated Chrome profile.
 
-Pixiv blocks many US datacenter IPs, and a cloud agent does not have your home
-IP or your logged-in Chrome. Run this on your own machine.
+Do not copy the system Chrome Default profile. Those cookies use app-bound
+encryption and a copy does not stay logged in. Log in once with --login in a
+separate user-data directory, then reuse it with --proxy.
 
-The script copies Chrome's login files to a temp folder, opens that copy, and
-writes artwork page URLs. It does not read cookie values, does not copy
-passwords or history, and does not write cookies into the git repo. The temp
-copy is deleted when the script exits.
-
-Setup and the manual URL-paste path are in collect_pixiv_windows.md.
+This script writes artwork page URLs only. It does not download images and
+does not read cookies. Originals are a later step: download_pixiv_originals.py.
+Setup is in collect_pixiv_windows.md.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sys
-import tempfile
 from collections import Counter
 from pathlib import Path
 
-from chrome_profile import (
-    assert_outside_repo,
-    copy_chrome_profile_for_pixiv,
-    default_chrome_user_data,
-)
+from chrome_profile import default_dedicated_profile, validate_proxy
+from pixiv_browser import open_pixiv, require_windows
 from pixiv_home import (
     ADULT_R18_QUERIES,
     collect_rows_from_stubs,
@@ -147,27 +140,30 @@ def scrape(page, args) -> tuple[list[dict], dict]:
     return rows, notes
 
 
-def run_browser(user_data_dir: Path, args) -> tuple[list[dict], dict]:
+def run_browser(profile: Path, proxy: str, args) -> tuple[list[dict], dict]:
+    playwright, context = open_pixiv(profile, proxy, REPO_ROOT, headless=args.headless)
+    page = context.pages[0] if context.pages else context.new_page()
     try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        _exit(
-            "Install Playwright on this Windows PC: py -3 -m pip install playwright\n"
-            "Use the Chrome already installed on the PC. Do not switch the script to "
-            "Playwright's bundled Chromium; Windows will not decrypt the copied login there."
+        return scrape(page, args)
+    finally:
+        context.close()
+        playwright.stop()
+
+
+def run_login(profile: Path, proxy: str) -> None:
+    playwright, context = open_pixiv(profile, proxy, REPO_ROOT, headless=False)
+    page = context.pages[0] if context.pages else context.new_page()
+    try:
+        page.goto("https://www.pixiv.net/", wait_until="domcontentloaded", timeout=60000)
+        print(
+            "Log into Pixiv in this window and open one R-18 artwork so the session is real.\n"
+            "This profile is kept on disk. Do not commit it. Press Enter here when you are done.",
+            file=sys.stderr,
         )
-    with sync_playwright() as playwright:
-        context = playwright.chromium.launch_persistent_context(
-            str(user_data_dir),
-            channel="chrome",
-            headless=args.headless,
-            viewport={"width": 1280, "height": 900},
-        )
-        page = context.pages[0] if context.pages else context.new_page()
-        try:
-            return scrape(page, args)
-        finally:
-            context.close()
+        input()
+    finally:
+        context.close()
+        playwright.stop()
 
 
 def write_export(rows: list[dict], notes: dict, out: Path) -> None:
@@ -182,9 +178,14 @@ def write_export(rows: list[dict], notes: dict, out: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-check", action="store_true", help="Validate queries and exit. No browser.")
-    parser.add_argument("--dry-run", action="store_true", help="Copy the profile to temp, delete it, do not open Pixiv.")
-    parser.add_argument("--user-data", type=Path, default=None, help="Chrome User Data directory.")
-    parser.add_argument("--profile", default="Default", help="Chrome profile folder name, e.g. Default or Profile 1.")
+    parser.add_argument("--login", action="store_true", help="Open the dedicated profile so you can log in once.")
+    parser.add_argument(
+        "--dedicated-profile",
+        type=Path,
+        default=None,
+        help="Persistent Chrome user-data dir. Not the system Chrome profile.",
+    )
+    parser.add_argument("--proxy", default="", help="Local proxy, for example http://127.0.0.1:7890.")
     parser.add_argument("--user-id", default="", help="Pixiv numeric user id, if the page does not show one.")
     parser.add_argument("--mode", choices=("bookmarks", "r18", "both"), default="both")
     parser.add_argument("--limit", type=int, default=60)
@@ -204,44 +205,29 @@ def main() -> None:
         print(json.dumps({"self_check": "ok", "queries": len(ADULT_R18_QUERIES)}))
         return
 
-    if sys.platform != "win32":
-        _exit(
-            "This collector runs on Windows with your logged-in Chrome. "
-            "A cloud agent cannot use your home IP or your Chrome profile. "
-            "Paste artwork URLs instead and run merge_exports.py. "
-            "See collect_pixiv_windows.md."
-        )
+    require_windows("Pixiv URL collection")
 
     if args.out.name in {"style_candidates.jsonl", "style_candidates.csv"}:
         _exit("Refusing to overwrite style_candidates. Write the gitignored export, then run merge_exports.py.")
 
-    user_data = args.user_data or default_chrome_user_data()
-    temp_dir = Path(tempfile.mkdtemp(prefix="pixiv-chrome-copy-"))
+    profile = args.dedicated_profile or default_dedicated_profile()
     try:
-        assert_outside_repo(temp_dir, REPO_ROOT)
+        proxy = validate_proxy(args.proxy)
+    except RuntimeError as exc:
+        _exit(str(exc))
+    if args.login:
         try:
-            copied = copy_chrome_profile_for_pixiv(user_data, args.profile, temp_dir)
-        except PermissionError:
-            _exit(
-                "Could not copy the Chrome profile because a file is locked. "
-                "Close Chrome completely, including the tray icon, and rerun. "
-                "The script will not read the live profile in place."
-            )
-        except FileNotFoundError as exc:
+            run_login(profile, proxy)
+        except RuntimeError as exc:
             _exit(str(exc))
-        print(
-            f"copied {len(copied['copied_files'])} login files into a temp profile",
-            file=sys.stderr,
-        )
-        if args.dry_run:
-            print(json.dumps({"dry_run": "ok", "copied_files": copied["copied_files"]}))
-            return
-        rows, notes = run_browser(temp_dir, args)
-        # The export path is a gitignored catalog scratch file, not the Chrome copy.
-        write_export(rows, notes, args.out)
-        print(json.dumps({"out": str(args.out), **notes}, ensure_ascii=False, indent=2))
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        print(json.dumps({"login": "closed", "dedicated_profile": str(profile)}))
+        return
+    try:
+        rows, notes = run_browser(profile, proxy, args)
+    except RuntimeError as exc:
+        _exit(str(exc))
+    write_export(rows, notes, args.out)
+    print(json.dumps({"out": str(args.out), "dedicated_profile": str(profile), **notes}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

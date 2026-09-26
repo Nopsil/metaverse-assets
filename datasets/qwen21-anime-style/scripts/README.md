@@ -25,18 +25,19 @@ The run also writes `catalog/civitai_adult_pending.csv` for adult rows that are 
 
 `fetch_pixiv.py` uses the public illustration search and `https://www.pixiv.net/ajax/illust/{id}` for safe-mode works. It also reads the monthly illustration ranking and keeps original works.
 
-**Do not collect R-18 here.** A probe of `mode=r18` returned works with `xRestrict=0` only. Pixiv blocks many US datacenter IPs, and a Cursor cloud agent does not have your home IP or your logged-in Chrome. Do not paste a cookie or `PIXIV_REFRESH_TOKEN` into the repo.
+**Do not collect R-18 here, and do not download Pixiv originals here.** A probe of `mode=r18` returned works with `xRestrict=0` only. Pixiv blocks many US datacenter IPs. Do not paste a cookie or `PIXIV_REFRESH_TOKEN` into the repo. Do not copy Chrome Default; ABE v20 cookies do not stay logged in.
 
 ## Pixiv on your Windows PC
 
-`collect_pixiv_windows.py` copies Chrome's login files to a temp folder, opens installed Chrome on that copy, and writes artwork page URLs. It does not copy passwords or history, does not read cookie values, and deletes the temp copy on exit. The guide, including how to paste bookmark URLs by hand, is `collect_pixiv_windows.md`.
+`collect_pixiv_windows.py` and `download_pixiv_originals.py` use a dedicated Playwright profile and `--proxy`. `--login` is once. The collector writes page URLs. The downloader saves `img-original` files under gitignored `catalog/_originals/`, skips ugoira, and keeps the first 3 stills of a multi-page work. The run order is `collect_pixiv_windows.md`.
 
 ```bat
-py -3 collect_pixiv_windows.py --self-check
-py -3 collect_pixiv_windows.py --mode both --limit 60
+py -3 collect_pixiv_windows.py --login --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
+py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
+py -3 download_pixiv_originals.py --catalog ../catalog/style_candidates.jsonl --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
 
-`--self-check` only validates the adult search words. On Linux or macOS the collector exits without opening a browser.
+`--self-check` only validates the adult search words. On Linux or macOS both scripts exit without opening a browser.
 
 ## Merge and dedupe
 
@@ -51,4 +52,4 @@ That writes gitignored `catalog/_merged_preview.jsonl` and prints added, dropped
 
 ## Safety screen
 
-`safety.py` is the shared denylist (ages under 21, loli/shota, school, child-coded series, chibi, photoreal, furry, 3D). Backslashes in booru tags are stripped before matching, so `suomi_\(girls'_frontline\)` still drops. `test_safety.py` and `test_home_collect.py` lock the examples. Passing the screen is not a visual approval.
+`safety.py` is the shared denylist (ages under 21, loli/shota, school, child-coded series, chibi, photoreal, furry, 3D). A cute face or stylized body is not a drop by itself. Child-coded characters stay out even when drawn looking older. Backslashes in booru tags are stripped before matching, so `suomi_\(girls'_frontline\)` still drops. `test_safety.py` and `test_home_collect.py` lock the examples. Passing the screen is not a visual approval.

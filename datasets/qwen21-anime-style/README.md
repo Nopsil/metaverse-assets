@@ -8,13 +8,13 @@ Nothing here trains a model. Other files in the assets repo are untouched.
 
 Zero minors. Rows must be clearly adult characters, or clean all-ages illustrations of adult-looking characters. School uniforms, child-coded series, stated ages under 21, chibi, and ambiguous age are out. If a picture is unclear, it does not belong in the set.
 
-Metadata filters are not enough. Every kept URL had a thumbnail review on 2026-09-26, and **every URL still needs a full-size human look before download or training**.
+Metadata filters are not enough. 116 committed URLs had a thumbnail review on 2026-09-26. One later Civitai URL is metadata-only (`visual_review=pending`). **Every URL still needs a full-size look of the original file before training.** Thumbnail review did not see `img-original`.
 
 ## Layout
 
 | Path | Role |
 | --- | --- |
-| `catalog/style_candidates.csv` | Reviewed style candidates (116 rows). |
+| `catalog/style_candidates.csv` | Style candidates (117 URLs: 116 thumbnail_pass, 1 pending). |
 | `catalog/style_candidates.jsonl` | Same rows, plus fields used by the scripts. |
 | `catalog/nsfw_anatomy_scaffold.csv` | Header only. Anatomy set is not populated. |
 | `catalog/pixiv_r18_probe.json` | Public R-18 search does not return restricted works. |
@@ -42,10 +42,11 @@ Pixiv blocks many US datacenter IPs. The remote box used for this catalog cannot
 Practical path:
 
 1. Keep using the public catalog scripts here for Civitai, and for safe-mode Pixiv when that network answers.
-2. On your Windows PC, run `scripts/collect_pixiv_windows.py`. It copies Chrome's login files to a temp folder, opens that copy, and writes artwork page URLs. Cookies, passwords, and the temp profile are not committed. The temp copy is deleted when the script exits.
-3. Or copy bookmark URLs into `catalog/pixiv_urls.txt` (gitignored) and merge them with `scripts/merge_exports.py`.
+2. On your Windows PC, log in once in a **dedicated** Chrome profile (not a copy of Chrome Default; those cookies do not transfer). Then run `scripts/collect_pixiv_windows.py` with `--dedicated-profile` and `--proxy`.
+3. Download full-size `img-original` files with `scripts/download_pixiv_originals.py` into gitignored `catalog/_originals/`. The catalog rows themselves stay page URLs. Thumbs (`square1200`, `master1200`) are not the training files.
+4. Or copy bookmark URLs into `catalog/pixiv_urls.txt` (gitignored) and merge them with `scripts/merge_exports.py`.
 
-`scripts/collect_pixiv_windows.md` has the commands, the paste format, and the dedupe rules. A reviewed row is kept when the same artwork id is imported again.
+`scripts/collect_pixiv_windows.md` is the run order: log in, collect URLs, download originals, then dedupe.
 
 ## Rebuild
 

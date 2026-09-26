@@ -8,7 +8,6 @@ import sys
 import unittest
 from pathlib import Path
 
-from chrome_profile import assert_outside_repo, copy_chrome_profile_for_pixiv
 from fetch_civitai import adult_pending_rows, cap_showcase_rows
 from merge_exports import merge_rows
 from pixiv_home import (
@@ -108,45 +107,89 @@ class HomeCollectTest(unittest.TestCase):
         self.assertEqual(works, [{"id": "9"}])
 
 
-class ChromeCopyTest(unittest.TestCase):
-    def test_copy_is_allowlist_and_leaves_source_alone(self):
-        import tempfile
+class DedicatedProfileTest(unittest.TestCase):
+    def test_refuses_system_chrome_and_repo_paths(self):
+        from chrome_profile import (
+            assert_dedicated_profile,
+            default_dedicated_profile,
+            is_system_chrome_path,
+            system_chrome_user_data,
+            validate_proxy,
+        )
 
-        with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / "User Data"
-            profile = src / "Profile 1"
-            (profile / "Network").mkdir(parents=True)
-            (profile / "Cache").mkdir()
-            (profile / "Network" / "Cookies").write_bytes(b"sqlite-bytes-not-logged")
-            (profile / "Preferences").write_text("{}", encoding="utf-8")
-            (profile / "Login Data").write_text("passwords", encoding="utf-8")
-            (profile / "Cache" / "blob").write_text("cache", encoding="utf-8")
-            (src / "Local State").write_text(
-                json.dumps({"os_crypt": {"encrypted_key": "abc"}, "profile": {"last_used": "Profile 1"}}),
-                encoding="utf-8",
-            )
-            dest = Path(tmp) / "copy"
-            summary = copy_chrome_profile_for_pixiv(src, "Profile 1", dest)
-            self.assertIn("Network/Cookies", summary["copied_files"])
-            self.assertFalse((dest / "Default" / "Login Data").exists())
-            self.assertFalse((dest / "Default" / "Cache").exists())
-            retargeted = json.loads((dest / "Local State").read_text(encoding="utf-8"))
-            self.assertEqual(retargeted["profile"]["last_used"], "Default")
-            source_state = json.loads((src / "Local State").read_text(encoding="utf-8"))
-            self.assertEqual(source_state["profile"]["last_used"], "Profile 1")
-            self.assertNotIn("sqlite-bytes-not-logged", json.dumps(summary))
-            with self.assertRaises(RuntimeError):
-                assert_outside_repo(dest, Path(tmp))
+        system = system_chrome_user_data()
+        self.assertTrue(is_system_chrome_path(system))
+        self.assertTrue(is_system_chrome_path(system / "Default"))
+        with self.assertRaises(RuntimeError):
+            assert_dedicated_profile(system / "Default", Path("/tmp/not-the-profile"))
+        repo = Path(__file__).resolve().parents[1]
+        with self.assertRaises(RuntimeError):
+            assert_dedicated_profile(repo / "catalog", repo.parents[1])
+        dedicated = default_dedicated_profile()
+        self.assertFalse(is_system_chrome_path(dedicated))
+        self.assertEqual(validate_proxy("http://127.0.0.1:7890"), "http://127.0.0.1:7890")
+        with self.assertRaises(RuntimeError):
+            validate_proxy("127.0.0.1:7890")
 
-    def test_missing_cookies_raise(self):
-        import tempfile
 
-        with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / "User Data"
-            (src / "Default").mkdir(parents=True)
-            (src / "Local State").write_text("{}", encoding="utf-8")
-            with self.assertRaises(FileNotFoundError):
-                copy_chrome_profile_for_pixiv(src, "Default", Path(tmp) / "dest")
+class OriginalUrlTest(unittest.TestCase):
+    def test_img_original_only(self):
+        from pixiv_originals import is_original_url, originals_for_illust
+
+        original = "https://i.pximg.net/img-original/img/2024/01/01/00/00/00/123_p0.png"
+        thumb = "https://i.pximg.net/c/540x540_70/img-master/img/2024/01/01/00/00/00/123_p0_master1200.jpg"
+        self.assertTrue(is_original_url(original))
+        self.assertFalse(is_original_url(thumb))
+        self.assertFalse(is_original_url(original.replace("img-original", "img-master")))
+        kept = originals_for_illust(
+            {
+                "id": "123",
+                "title": "夜",
+                "illustType": 0,
+                "pageCount": 1,
+                "xRestrict": 1,
+                "tags": {"tags": [{"tag": "お姉さん"}, {"tag": "オリジナル"}]},
+                "urls": {"original": original, "regular": thumb},
+            }
+        )
+        self.assertEqual(kept["urls"], [original])
+        self.assertEqual(originals_for_illust({"illustType": 2, "title": "loop"})["skip"], "ugoira")
+        pages = [{"urls": {"original": original.replace("_p0", f"_p{n}")}} for n in range(5)]
+        multi = originals_for_illust(
+            {
+                "title": "夜",
+                "illustType": 0,
+                "pageCount": 5,
+                "tags": {"tags": [{"tag": "女性"}]},
+                "urls": {"original": original},
+            },
+            pages,
+        )
+        self.assertEqual(len(multi["urls"]), 3)
+        self.assertEqual(multi["truncated"], 2)
+        blocked = originals_for_illust(
+            {
+                "title": "制服",
+                "illustType": 0,
+                "pageCount": 1,
+                "tags": {"tags": [{"tag": "セーラー服"}]},
+                "urls": {"original": original},
+            }
+        )
+        self.assertEqual(blocked["urls"], [])
+        self.assertTrue(blocked["skip"])
+
+    def test_targets_are_pixiv_pages(self):
+        from download_pixiv_originals import pixiv_targets
+
+        rows = pixiv_targets(
+            [
+                {"source": "pixiv", "id": "10", "url": "https://www.pixiv.net/artworks/10"},
+                {"source": "civitai", "id": "99", "url": "https://civitai.com/images/99"},
+                {"source": "pixiv", "id": "10", "url": "https://www.pixiv.net/en/artworks/10"},
+            ]
+        )
+        self.assertEqual([row["id"] for row in rows], ["10"])
 
 
 class MergeTest(unittest.TestCase):
@@ -244,6 +287,14 @@ class CliTest(unittest.TestCase):
         )
         self.assertEqual(refused.returncode, 2)
         self.assertIn("Windows", refused.stderr)
+        download = subprocess.run(
+            [sys.executable, str(HERE / "download_pixiv_originals.py")],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(download.returncode, 2)
+        self.assertIn("Windows", download.stderr)
 
 
 if __name__ == "__main__":

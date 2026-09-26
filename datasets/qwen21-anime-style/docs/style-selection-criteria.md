@@ -32,6 +32,14 @@ Hard drop, even if the picture is otherwise pretty:
 
 `1girl` is a count tag, not an age tag.
 
+## How age is judged
+
+Do not mark someone a minor from body proportions, a large-eyed face, or a cute costume by themselves. Use the series, the named character, and the setting the artist states.
+
+- A child-coded or school-coded character is out even when the drawing looks grown.
+- A clearly adult character (canonical adult, お姉さん, 人妻, 熟女, stated age 21 or older) stays in the pool when the only issue is a cute style.
+- When the series and the author are silent and the picture is still unclear at full size, delete the row.
+
 ## Rating
 
 | `rating` | Meaning |
@@ -43,15 +51,15 @@ Suggestive costume on a Pixiv safe-mode page stays `all-ages`.
 
 ## Diversity caps
 
-The builder keeps at most a few images per Pixiv artist and per Civitai model so one creator does not become the style. The reviewed snapshot is 116 rows (49 Pixiv, 67 Civitai; 72 all-ages, 44 adult).
+The builder keeps at most a few images per Pixiv artist and per Civitai model so one creator does not become the style. The cloud snapshot is 117 URLs (49 Pixiv, 68 Civitai; 72 all-ages, 45 adult). 116 of those had a thumbnail pass. One newer Civitai adult URL is `visual_review=pending` (metadata screen only).
 
 Home-exported Pixiv URLs are merged with `scripts/merge_exports.py`. The same artwork id is one row. A `thumbnail_pass` row is not replaced by a later paste of that id. URL-only pastes stay `rating=unreviewed` and `visual_review=pending` until someone opens the full image. See `scripts/collect_pixiv_windows.md`.
 
 ## Human review
 
-1. Metadata screen (`scripts/safety.py`).
-2. Thumbnail pass (done for the committed snapshot; `visual_review=thumbnail_pass`).
-3. Full-size pass before any download. Thumbnails miss small cues. If age is still unclear, delete the row.
+1. Metadata screen (`scripts/safety.py`): series, character, school, stated age.
+2. Thumbnail pass on the committed cloud snapshot (`visual_review=thumbnail_pass`). That pass saw thumbs only, not `img-original`.
+3. On Windows, download originals with `scripts/download_pixiv_originals.py`, then review those files. Delete the row if the series, character, or setting is child-coded. Do not delete a clearly adult character for cute proportions.
 
 ## Not this catalog
 

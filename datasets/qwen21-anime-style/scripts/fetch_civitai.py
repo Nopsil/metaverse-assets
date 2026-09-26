@@ -30,7 +30,7 @@ SEARCHES = [
     {"types": "Checkpoint", "query": "animagine", "sort": "Highest Rated", "nsfw": "false", "limit": 6},
     {"types": "Checkpoint", "baseModels": "Anima", "sort": "Highest Rated", "nsfw": "false", "limit": 8},
     {"types": "Checkpoint", "query": "wai illustrious", "sort": "Highest Rated", "nsfw": "true", "limit": 8},
-    {"types": "Checkpoint", "baseModels": "Illustrious", "sort": "Most Downloaded", "nsfw": "true", "limit": 12},
+    {"types": "Checkpoint", "baseModels": "Illustrious", "sort": "Most Downloaded", "nsfw": "true", "limit": 18},
     {"types": "LORA", "query": "anime style", "baseModels": "Illustrious", "sort": "Highest Rated", "nsfw": "false", "limit": 10},
     {"types": "LORA", "query": "cel shading", "sort": "Highest Rated", "nsfw": "false", "limit": 8},
     # Adult anime showcases. Latest galleries are often safe, so the fetcher

@@ -1,69 +1,80 @@
-# Collect Pixiv on your Windows PC
+# Collect Pixiv on your Windows PC, then download originals
 
-Pixiv R-18 is not collectable from the cloud box that built this catalog.
+Pixiv R-18 is not collectable from the cloud box that built this catalog, and this cloud box cannot download R-18 originals either.
 
 - Grok Bot's remote machine cannot use Pixiv. The IP is a US datacenter address, and Pixiv blocks those.
-- A Cursor cloud agent usually does not have your home IP or your logged-in Chrome either.
-- Public `mode=r18` search, when it answers at all, returns safe-mode works (`xRestrict=0`). That is not an R-18 set. See `catalog/pixiv_r18_probe.json`.
+- A Cursor cloud agent does not have your home IP or your logged-in Chrome.
+- Public `mode=r18` search returns safe-mode works (`xRestrict=0`). That is not an R-18 set. See `catalog/pixiv_r18_probe.json`.
+- Copying Chrome's Default profile does not work. Those cookies use app-bound encryption (ABE v20). A copy never stays logged in. Do not use a Cookies-file copy of Default.
 
-Do the collection at home. Two ways are below. Neither one puts a cookie, refresh token, or Chrome profile in git.
+Use one dedicated Playwright Chrome profile and your local proxy. The profile that already logged in on the home PC is `C:\Users\nopsi\temp\pixiv-collector-chrome` with proxy `http://127.0.0.1:7890`.
 
-## 1. Script (Chrome profile copy)
+Nothing here puts a cookie, refresh token, Chrome profile, or image file in git.
 
-`collect_pixiv_windows.py` is Windows-only.
+## Age check
 
-What it does:
+Do not decide that a character is a minor from body proportions or a cute face alone. Check the series, the character, and what the artist says the setting is.
 
-1. Copies only the login files for one Chrome profile into a temp folder: `Local State`, `Cookies`, and preferences.
-2. It does **not** copy `Login Data` (saved passwords), History, or cache, and it does not read cookie values in Python.
-3. It opens **installed Google Chrome** on that temp copy, so the real profile stays closed and unmodified.
-4. It reads your public bookmarks and/or an allowlisted R-18 search (お姉さん / 熟女 / 人妻 / 長身 / 巨乳, original illustrations).
-5. Every title, tag, and description goes through `safety.py`. School, stated age under 21, child-coded series, chibi, and R-18G are dropped.
-6. It writes artwork **page URLs** to `catalog/_pixiv_windows_export.jsonl` (gitignored).
-7. It deletes the temp copy on the way out.
+- Drop child-coded and school-coded characters even when the drawing looks adult.
+- Do not drop a clearly adult character (canonical adult, お姉さん, 人妻, 熟女, stated age 21 or older) only because the style is cute.
+- `scripts/safety.py` enforces the series and age tags. A full-size look of the original file is still required when the setting is unclear.
 
-If Windows kills the script before that delete, remove leftover folders named `pixiv-chrome-copy-*` under your temp directory. Those folders contain a session cookie. Do not copy them into this repo.
+## Run order
 
-### Setup
+From `datasets/qwen21-anime-style/scripts` on Windows. Install once: `py -3 -m pip install playwright`. The scripts launch installed Google Chrome (`channel=chrome`), not Playwright's bundled Chromium.
 
-1. Install [Google Chrome](https://www.google.com/chrome/) and log into Pixiv in the profile you want to use (`Default`, or `Profile 1`, …). Confirm an R-18 page opens in that window.
-2. Install Python 3.11+ from python.org if `py -3` is not already available.
-3. In a terminal:
+Set the profile and proxy in each command. Close any Chrome window that already has this dedicated profile open.
+
+### 1. Log in once
 
 ```bat
-py -3 -m pip install playwright
+py -3 collect_pixiv_windows.py --login --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
 
-Do not point the script at Playwright's bundled Chromium. Windows ties Chrome's saved login to the installed Chrome app. The script launches `channel="chrome"`.
+A Chrome window opens on that folder. Log into Pixiv and open one R-18 artwork. Press Enter in the terminal. The profile stays on disk. Do not commit that folder.
 
-4. Close Chrome completely, including the tray icon. If a cookie file is locked, the script stops. It will not scrape the live profile in place.
-
-### Run
-
-From `datasets/qwen21-anime-style/scripts`:
+### 2. Collect artwork page URLs
 
 ```bat
 py -3 collect_pixiv_windows.py --self-check
-py -3 collect_pixiv_windows.py --mode both --limit 60
+py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
 
-Other flags:
+`--mode both` reads public bookmarks and an allowlisted R-18 search (お姉さん / 熟女 / 人妻 / 長身 / 巨乳, original illustrations). Safe-mode stand-ins from a masked R-18 search are not saved. Every title, tag, and description goes through `safety.py`. Output is gitignored `catalog/_pixiv_windows_export.jsonl`.
 
 | Flag | Meaning |
 | --- | --- |
-| `--profile "Profile 1"` | Chrome profile folder under `%LOCALAPPDATA%\Google\Chrome\User Data`. |
-| `--user-id 123456` | Numeric id from `https://www.pixiv.net/users/123456`, if the script cannot see it. |
-| `--mode bookmarks` | Your public bookmarks only. |
-| `--mode r18` | Allowlisted R-18 searches only. Safe-mode stand-ins are not saved. |
-| `--include-private` | Also read private bookmarks (`rest=hide`). They stay in the gitignored export unless you later merge them. |
-| `--include-ai` | Keep works Pixiv has labeled as AI. Off by default, same as the public fetcher. |
-| `--dry-run` | Copy the profile to temp, delete it, do not open Pixiv. |
+| `--dedicated-profile` | Persistent Chrome user-data directory. Not the system Chrome profile. |
+| `--proxy` | Local proxy, `http://127.0.0.1:7890` on this PC. |
+| `--login` | Open the profile for a one-time Pixiv login. |
+| `--user-id 123456` | Numeric id from `https://www.pixiv.net/users/123456`, if the page does not show one. |
+| `--mode bookmarks` | Public bookmarks only. |
+| `--mode r18` | Allowlisted R-18 searches only. |
+| `--include-private` | Also read private bookmarks. They stay in the gitignored export unless you merge them. |
+| `--include-ai` | Keep works Pixiv has labeled as AI. Off by default. |
 
-A cloud shell, including this repo's agent, exits immediately on Linux and macOS. `--self-check` only validates the search words.
+`--self-check` only validates the search words and can run anywhere. A real collect or download exits on Linux and macOS.
 
-## 2. Paste URLs (no script)
+### 3. Download img-original files
 
-Use this when you would rather export from the browser yourself.
+The catalog stores artwork **page** URLs. `square1200` and `master1200` are thumbnails. The downloader opens each Pixiv page in the dedicated profile and saves `i.pximg.net/img-original/...` only.
+
+```bat
+py -3 download_pixiv_originals.py --catalog ../catalog/style_candidates.jsonl --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
+```
+
+Files land in gitignored `catalog/_originals/` as `{id}_p0.jpg` (and `_p1`, `_p2` when the work has more than one still). A `manifest.jsonl` in that folder records skips. Do not commit the folder.
+
+- **Ugoira** (animated) is skipped.
+- **Multi-page** works save the first 3 stills and record how many later pages were left out.
+- A row whose tags or title fail `safety.py` is not saved.
+- Civitai rows in the same catalog are skipped here. This script is the Pixiv original path. A cloud machine did not download R-18 files.
+
+Then review those files at full size. Delete a file and its catalog row when the series, character, or author's setting is child-coded or school-aged. Cute proportions on a clearly adult character are not a reason to delete.
+
+## Paste URLs (no collector)
+
+Use this when you would rather copy links from the browser yourself.
 
 1. On Pixiv, open your bookmarks or a search you have already looked at.
 2. Copy artwork links. These shapes all work:
@@ -74,10 +85,10 @@ https://www.pixiv.net/en/artworks/123456789
 https://www.pixiv.net/i/123456789
 ```
 
-3. Put one URL per line in a file **outside git** or in the gitignored path `catalog/pixiv_urls.txt`. Lines starting with `#` are ignored. An empty template with comments is `catalog/pixiv_url_paste.example.txt`. Do not commit the filled-in file.
+3. Put one URL per line in gitignored `catalog/pixiv_urls.txt`. Lines starting with `#` are ignored. An empty template is `catalog/pixiv_url_paste.example.txt`. Do not commit the filled-in file.
 4. You can also save a CSV with a `url` column and optional `title` and `tags` columns. Separate tags with `|`.
 
-The paste file has no metadata screen until merge time. Rows with a title or tags are screened. Rows that are only a URL are kept as `rating=unreviewed` and `visual_review=pending`. They are not cleared for training.
+The paste file has no metadata screen until merge time. Rows with a title or tags are screened. Rows that are only a URL are kept as `rating=unreviewed` and `visual_review=pending`. They are not cleared for training. After they are in the catalog, step 3 above downloads the originals.
 
 ## Merge and dedupe
 
@@ -103,15 +114,15 @@ python3 merge_exports.py \
   --apply
 ```
 
-`--apply` rewrites `style_candidates.jsonl` and `style_candidates.csv`. Imported rows stay `visual_review=pending` until you have opened the full image.
+`--apply` rewrites `style_candidates.jsonl` and `style_candidates.csv`. Imported rows stay `visual_review=pending` until you have opened the original file.
 
 Dedupe key is the source plus the numeric id, so `pixiv.net/en/artworks/ID` and `pixiv.net/artworks/ID` are one row. A reviewed row wins over a later import of the same id. Two pending imports of the same id keep the one with more tags.
 
-Drop anything the screen catches (age under 21, school, loli/shota, child-coded series, chibi, gore). Opening the page is still required: a tag list cannot see the picture.
+If you already merged 13 Pixiv rows on the home PC (129 URLs) and those commits were not pushed, pull this branch and run the merge again from `catalog/_pixiv_windows_export.jsonl` so those rows stay. This cloud branch does not contain those 13 URLs.
 
-## After the URLs are in the catalog
+## After the originals are on disk
 
-1. Full-size review. If the character could be a minor, delete the row.
-2. Do not commit image files, cookies, or the temp Chrome folder.
-3. R-18 illustrations can stay on the style list when they are full drawings of adults. Close-up anatomy belongs in `catalog/nsfw_anatomy_scaffold.csv`, still with `safety_status=unreviewed` until you have checked the file. The collector does not fill that scaffold by itself.
+1. Review the files in `catalog/_originals/`. Delete a row when the series, character, or setting is child-coded. Do not delete a clearly adult character for a cute drawing style.
+2. Do not commit image files, cookies, or the dedicated Chrome profile.
+3. R-18 illustrations can stay on the style list when they are full drawings of adults. Close-up anatomy belongs in `catalog/nsfw_anatomy_scaffold.csv`, still with `safety_status=unreviewed` until you have checked the file.
 4. No training from this step.

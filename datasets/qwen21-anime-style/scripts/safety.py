@@ -1,7 +1,9 @@
 """Hard safety screen for the Qwen Image 2.1 anime-style catalog.
 
-Drop a row on any minor, underage, school-age, child-coded, or ambiguous-age
-signal. Callers still owe a human visual pass: metadata cannot see a picture.
+Drop a row on series, character, school, or a stated age under 21. A cute
+face or stylized proportions is not, by itself, a minor. A child-coded
+character stays out even when the drawing looks adult. Callers still owe a
+full-size look: metadata cannot see the picture.
 """
 
 from __future__ import annotations

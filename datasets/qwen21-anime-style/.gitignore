@@ -10,5 +10,5 @@ catalog/_*.csv
 catalog/_*.summary.json
 catalog/civitai_adult_pending.jsonl
 catalog/civitai_adult_pending.csv
-catalog/pixiv_urls.txt
-catalog/pixiv_url_paste.txt
+catalog/_originals/
+images/
