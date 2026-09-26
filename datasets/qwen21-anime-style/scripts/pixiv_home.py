@@ -24,6 +24,26 @@ ADULT_R18_QUERIES = [
     "巨乳 女性 オリジナル",
 ]
 
+# Adult petite / slim / flat originals. Not a child search: each line still
+# has to pass safety.py, and ロリ / school / series terms are refused.
+PETITE_ADULT_QUERIES = [
+    "スレンダー 女性 オリジナル",
+    "細身 女性 オリジナル",
+    "華奢 お姉さん オリジナル",
+    "貧乳 お姉さん オリジナル",
+]
+
+
+def queries_for_body(which: str) -> list[str]:
+    """mature keeps the older allowlist. petite is the underrepresented adult set."""
+    if which == "mature":
+        return list(ADULT_R18_QUERIES)
+    if which == "petite":
+        return list(PETITE_ADULT_QUERIES)
+    if which == "all":
+        return list(ADULT_R18_QUERIES) + list(PETITE_ADULT_QUERIES)
+    raise RuntimeError(f"Unknown body set {which!r}")
+
 FetchJson = Callable[[str], dict]
 
 _SECRET_KEY = re.compile(r"(?i)cookie|token|authorization|password|secret|phpsessid|sessionid")

@@ -33,6 +33,16 @@ class ScreenTest(unittest.TestCase):
         ok, reason = screen("美少女 お姉さん オリジナル", tags=["美少女", "女性"])
         self.assertTrue(ok, reason)
 
+    def test_petite_adult_is_kept_and_child_coded_flat_is_not(self):
+        ok, reason = screen(
+            "お姉さん オリジナル 貧乳 スレンダー 細身",
+            tags=["華奢", "女性", "オリジナル"],
+        )
+        self.assertTrue(ok, reason)
+        self.assertTrue(screen("ちっぱい お姉さん オリジナル", tags=["女性"])[0])
+        self.assertFalse(screen("ちっぱい ロリ オリジナル")[0])
+        self.assertFalse(screen("つるぺた オリジナル 女の子")[0])
+
     def test_allows_adult_anime_and_childhood_friend_trope(self):
         ok, reason = screen(
             "1girl, adult woman, anime style, cel shading, masterpiece, childhood friend"

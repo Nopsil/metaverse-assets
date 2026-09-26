@@ -13,7 +13,7 @@ Nothing here puts a cookie, refresh token, Chrome profile, or image file in git.
 
 ## Age check
 
-Do not decide that a character is a minor from body proportions or a cute face alone. Check the series, the character, and what the artist says the setting is.
+Do not decide that a character is a minor from body proportions or a cute face alone. Check the series, the character, and what the artist says the setting is. Petite, slim, and flat-chested adults stay in the pool. A mature-only set is a bias, not a safety rule. `--body petite` searches those adult looks. `--body mature` keeps the older 熟女 / 長身 / 巨乳 allowlist.
 
 - Drop child-coded and school-coded characters even when the drawing looks adult.
 - Do not drop a clearly adult character (canonical adult, お姉さん, 人妻, 熟女, stated age 21 or older) only because the style is cute.

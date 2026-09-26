@@ -11,6 +11,7 @@ The catalog is a candidate pool for later training on **official Qwen Image 2.1*
 - Long edge at least 1024 and short edge at least 768.
 - Mix of framing (portrait, half-body, full-body) and costume (fantasy, wafuku, military, casual, witch, knight).
 - Original characters preferred. Named adults are allowed when the design is unmistakably adult and the row is not a dump of one face.
+- Adult body diversity. Keep petite, slim, and flat-chested characters when the setting is adult. Do not fill the pool with only tall, mature, or voluptuous figures. A petite adult is not a minor.
 - Pixiv: human or unlabeled illustrations. AI-labeled Pixiv works (`aiType == 2`) are skipped so the style target is not only model output. Civitai showcases are AI generations and are marked `ai_generated=yes`.
 
 ## What to drop
@@ -37,7 +38,7 @@ Hard drop, even if the picture is otherwise pretty:
 Do not mark someone a minor from body proportions, a large-eyed face, or a cute costume by themselves. Use the series, the named character, and the setting the artist states.
 
 - A child-coded or school-coded character is out even when the drawing looks grown.
-- A clearly adult character (canonical adult, お姉さん, 人妻, 熟女, stated age 21 or older) stays in the pool when the only issue is a cute style.
+- A clearly adult character (canonical adult, お姉さん, 人妻, 熟女, stated age 21 or older) stays in the pool when the only issue is a cute style. 貧乳, スレンダー, 細身, and 華奢 stay too. つるぺた still drops: it is the child-coded undeveloped tag, not an adult petite build.
 - When the series and the author are silent and the picture is still unclear at full size, delete the row.
 
 ## Rating

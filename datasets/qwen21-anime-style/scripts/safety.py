@@ -110,13 +110,14 @@ _JA_AND_SERIES = [
     "未成年",
     "児童",
     "園児",
+    # つるぺた marks an undeveloped child-coded body. Adult petite/flat
+    # words (貧乳, スレンダー, 細身, 華奢) are not in this list.
     "つるぺた",
     "幼児",
     "赤ちゃん",
     "乳児",
     "バブみ",
     "おむつ",
-    "ちっぱい",
     "ちび",
     "デフォルメ",
     "学生服",
@@ -453,6 +454,12 @@ _STYLE_CUES = [
     ("nekomimi", "cat ears"),
     ("巨乳", "adult figure"),
     ("長身", "tall adult figure"),
+    ("貧乳", "petite adult"),
+    ("スレンダー", "slim adult"),
+    ("細身", "slim adult"),
+    ("華奢", "petite adult"),
+    ("slender", "slim adult"),
+    ("petite", "petite adult"),
 ]
 
 

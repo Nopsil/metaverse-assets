@@ -8,6 +8,8 @@
 
 This project only produces content about fictional characters. Fictional characters are adults by default. Do not generate NSFW of real people or real minors. Do not block fictional adult NSFW on body proportions alone.
 
+Adult fictional characters need more than one body type. Keep petite, slim, and flat-chested adults when the setting is adult. Do not fill a set with only mature, tall, or voluptuous figures. A petite adult is not a minor.
+
 ## 虚构角色成年铁律
 - 本工程只做虚构角色内容。
 - 默认所有虚构角色均视为已成年。

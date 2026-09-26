@@ -21,10 +21,12 @@ from chrome_profile import default_dedicated_profile, validate_proxy
 from pixiv_browser import open_pixiv, require_windows
 from pixiv_home import (
     ADULT_R18_QUERIES,
+    PETITE_ADULT_QUERIES,
     collect_rows_from_stubs,
     iter_bookmark_works,
     iter_r18_search,
     pixiv_block_reason,
+    queries_for_body,
     validate_queries,
 )
 
@@ -116,7 +118,7 @@ def scrape(page, args) -> tuple[list[dict], dict]:
     if args.mode in {"r18", "both"}:
         found, masked = iter_r18_search(
             fetch_json,
-            ADULT_R18_QUERIES,
+            queries_for_body(getattr(args, "body", "all")),
             pages=args.pages,
             limit=args.limit,
         )
@@ -188,6 +190,12 @@ def main() -> None:
     parser.add_argument("--proxy", default="", help="Local proxy, for example http://127.0.0.1:7890.")
     parser.add_argument("--user-id", default="", help="Pixiv numeric user id, if the page does not show one.")
     parser.add_argument("--mode", choices=("bookmarks", "r18", "both"), default="both")
+    parser.add_argument(
+        "--body",
+        choices=("all", "mature", "petite"),
+        default="all",
+        help="R-18 search set. petite is slim/flat adult originals. mature is the older tall/voluptuous allowlist.",
+    )
     parser.add_argument("--limit", type=int, default=60)
     parser.add_argument("--pages", type=int, default=2, help="R-18 search pages per query.")
     parser.add_argument("--include-private", action="store_true", help="Also read private bookmarks (rest=hide).")
@@ -202,7 +210,12 @@ def main() -> None:
 
     if args.self_check:
         validate_queries(ADULT_R18_QUERIES)
-        print(json.dumps({"self_check": "ok", "queries": len(ADULT_R18_QUERIES)}))
+        validate_queries(PETITE_ADULT_QUERIES)
+        print(json.dumps({
+            "self_check": "ok",
+            "mature_queries": len(ADULT_R18_QUERIES),
+            "petite_queries": len(PETITE_ADULT_QUERIES),
+        }))
         return
 
     require_windows("Pixiv URL collection")

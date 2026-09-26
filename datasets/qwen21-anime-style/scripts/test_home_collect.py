@@ -12,6 +12,7 @@ from fetch_civitai import adult_pending_rows, cap_showcase_rows
 from merge_exports import merge_rows
 from pixiv_home import (
     ADULT_R18_QUERIES,
+    PETITE_ADULT_QUERIES,
     iter_bookmark_works,
     iter_r18_search,
     row_from_illust_body,
@@ -45,8 +46,11 @@ def _adult_body(**extra) -> dict:
 class HomeCollectTest(unittest.TestCase):
     def test_queries_are_adult_and_school_is_refused(self):
         validate_queries(ADULT_R18_QUERIES)
+        validate_queries(PETITE_ADULT_QUERIES)
         with self.assertRaises(RuntimeError):
             validate_queries(["制服 オリジナル"])
+        with self.assertRaises(RuntimeError):
+            validate_queries(["つるぺた オリジナル"])
 
     def test_r18_row_kept_and_secrets_dropped(self):
         row, why = row_from_illust_body(
