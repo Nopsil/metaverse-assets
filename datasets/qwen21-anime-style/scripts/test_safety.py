@@ -73,6 +73,14 @@ class ScreenTest(unittest.TestCase):
         self.assertFalse(screen("violet evergarden, 1girl")[0])
         self.assertFalse(screen("tohsaka rin, fate")[0])
         self.assertFalse(screen("gold ship, umamusume")[0])
+        self.assertFalse(screen(r"1girl, suomi_\(girls'_frontline\)")[0])
+        self.assertFalse(screen(r"darkness \(konosuba\), 1girl")[0])
+        self.assertFalse(screen("go-toubun no hanayome, 1girl")[0])
+        self.assertFalse(screen(r"ankha \(animal crossing\), 1girl")[0])
+        self.assertFalse(screen(r"reze \(chainsaw man\), naked towel")[0])
+        self.assertFalse(screen("1girl, 3d style, large breasts")[0])
+        self.assertFalse(screen("monika (doki doki literature club), 1girl")[0])
+        self.assertFalse(screen("shantae, 1girl, ponytail")[0])
         self.assertTrue(screen("お姉さん オリジナル 厚塗り", tags=["女の子"])[0])
 
 

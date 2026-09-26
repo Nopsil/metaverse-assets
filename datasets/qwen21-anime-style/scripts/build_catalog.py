@@ -35,6 +35,7 @@ CSV_FIELDS = [
     "base_model",
     "quality",
     "visual_review",
+    "collected_via",
 ]
 
 

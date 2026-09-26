@@ -2,7 +2,7 @@
 
 Separate from the style catalog. Do not merge these images into track A.
 
-This scaffold has **no image URLs**. Pixiv R-18 search from this environment returned only safe-mode works (`catalog/pixiv_r18_probe.json`). Civitai adult showcases that passed review were kept on the **style** list when they were full illustrations of adult characters, not genital close-ups.
+This scaffold has **no image URLs**. Pixiv R-18 search from a US datacenter does not return restricted works (`catalog/pixiv_r18_probe.json`). Pixiv also blocks many of those IPs outright. Collect R-18 on a home Windows Chrome profile (`scripts/collect_pixiv_windows.md`), then screen and review before any URL is added here. Civitai adult showcases that passed review were kept on the **style** list when they were full illustrations of adult characters, not genital close-ups.
 
 ## Purpose
 
@@ -37,8 +37,8 @@ Suggested size after review: about 150–300 images. Under 80 is too small for t
 
 ## How to add rows later
 
-1. Do not commit cookies, refresh tokens, or API keys.
-2. Fetch with the public Civitai client or a local Pixiv session.
+1. Do not commit cookies, refresh tokens, or API keys. Do not collect Pixiv from a US cloud VM.
+2. Fetch with the public Civitai client, or run `scripts/collect_pixiv_windows.py` on your own PC, or paste URLs and run `scripts/merge_exports.py`.
 3. Run `scripts/safety.py` on title, tags, and prompt.
 4. Review full size. Drop anything youthful.
 5. Append CSV/JSONL rows. Keep binaries out of git.

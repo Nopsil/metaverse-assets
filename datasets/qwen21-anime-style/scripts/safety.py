@@ -72,6 +72,7 @@ _EN_PATTERNS = [
     r"\bhyper-?realistic\b",
     r"\bultra\s+realistic\b",
     r"\b\d+\s*mm\s+lens\b",
+    r"\b3d\s*(?:style|render|renders|cg)\b",
     r"\bguros?\b",
     r"\bmesugaki\b",
     r"\bnagatoro\b",
@@ -173,6 +174,12 @@ _JA_AND_SERIES = [
     "けものフレンズ",
     "メダリスト",
     "暁山瑞希",
+    "チェンソーマン",
+    "この素晴らしい",
+    "めぐみん",
+    "五等分の花嫁",
+    "どうぶつの森",
+    "ドキドキ文芸部",
 ]
 
 _SERIES_EN = [
@@ -220,6 +227,18 @@ _SERIES_EN = [
     "kemono friends",
     "amiya (arknights",
     "suomi (girls",
+    "chainsaw man",
+    "konosuba",
+    "kono subarashii",
+    "megumin",
+    "go-toubun",
+    "gotoubun",
+    "quintessential quintuplets",
+    "animal crossing",
+    "ankha (animal",
+    "doki doki",
+    "monika (doki",
+    "shantae",
 ]
 
 # Exact tags that are ambiguous or minor-coded on their own.
@@ -272,7 +291,8 @@ _PHOTO_RE = re.compile(
 
 
 def normalize(text: str) -> str:
-    t = text.replace("_", " ").replace("　", " ").replace("\n", " ")
+    t = text.replace("\\", " ")
+    t = t.replace("_", " ").replace("　", " ").replace("\n", " ")
     t = t.replace("（", " ").replace("）", " ").replace("(", " ").replace(")", " ")
     t = re.sub(r"\s+", " ", t).strip().lower()
     return t

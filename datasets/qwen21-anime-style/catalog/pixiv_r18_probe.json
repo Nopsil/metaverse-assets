@@ -5,6 +5,7 @@
   "returned": 60,
   "xrestrict_positive": 0,
   "login_required": true,
+  "us_datacenter_blocked": true,
   "collected_at": "2026-09-26",
-  "todo": "Pixiv R-18 metadata needs a logged-in session. Do not paste cookies or refresh tokens into this repo. Filter any future ids with scripts/safety.py and a full-size age review before adding them to nsfw_anatomy_scaffold.csv."
+  "todo": "Do not collect Pixiv R-18 on a US cloud VM or a Cursor cloud agent. Those machines do not have the home IP or the logged-in Chrome, and Pixiv blocks many US datacenter IPs. Public mode=r18 still returned only xRestrict=0. On a home Windows PC run scripts/collect_pixiv_windows.py, or paste bookmark URLs and run scripts/merge_exports.py. Do not commit cookies. Screen with scripts/safety.py and a full-size review before any URL is kept."
 }

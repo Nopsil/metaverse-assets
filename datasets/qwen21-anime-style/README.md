@@ -14,14 +14,15 @@ Metadata filters are not enough. Every kept URL had a thumbnail review on 2026-0
 
 | Path | Role |
 | --- | --- |
-| `catalog/style_candidates.csv` | Reviewed style candidates (88 rows). |
+| `catalog/style_candidates.csv` | Reviewed style candidates (116 rows). |
 | `catalog/style_candidates.jsonl` | Same rows, plus fields used by the scripts. |
 | `catalog/nsfw_anatomy_scaffold.csv` | Header only. Anatomy set is not populated. |
 | `catalog/pixiv_r18_probe.json` | Public R-18 search does not return restricted works. |
+| `catalog/pixiv_url_paste.example.txt` | Empty example for a home-exported URL list. |
 | `docs/style-selection-criteria.md` | What “anime style” means here, and what is excluded. |
 | `docs/nsfw-anatomy-scaffold.md` | Separate adult-anatomy track (B). No image URLs. |
 | `captions/README.md` | Natural-language captions for Qwen Image 2.1. |
-| `scripts/` | Civitai public API fetch, Pixiv public fetch, safety screen. |
+| `scripts/` | Civitai public API fetch, Pixiv public fetch, Windows home collector, merge. |
 | `PLAN_REVISION.md` | Track A is broad style, not mouth-only. |
 | `REPORT.md` | Counts and the next human review pass. |
 
@@ -31,18 +32,30 @@ Metadata filters are not enough. Every kept URL had a thumbnail review on 2026-0
 
 `rating` is `all-ages` or `adult`.
 
-- Pixiv rows in this snapshot are safe-mode illustrations (`all-ages`). R-18 needs a personal login; see `scripts/README.md`.
+- Pixiv rows in this snapshot are safe-mode illustrations (`all-ages`). R-18 needs a personal login on a home connection. See below and `scripts/collect_pixiv_windows.md`.
 - Civitai `adult` rows are showcase images whose site rating is R or higher, or whose prompt is sexually explicit, and that still passed the age screen and thumbnail review.
+
+## Pixiv: collect at home, not from a US cloud box
+
+Pixiv blocks many US datacenter IPs. The remote box used for this catalog cannot finish an R-18 collection, and a Cursor cloud agent usually does not have your home IP or your logged-in Chrome either. Public `mode=r18` search, when it answers, returns safe-mode works only (`catalog/pixiv_r18_probe.json`).
+
+Practical path:
+
+1. Keep using the public catalog scripts here for Civitai, and for safe-mode Pixiv when that network answers.
+2. On your Windows PC, run `scripts/collect_pixiv_windows.py`. It copies Chrome's login files to a temp folder, opens that copy, and writes artwork page URLs. Cookies, passwords, and the temp profile are not committed. The temp copy is deleted when the script exits.
+3. Or copy bookmark URLs into `catalog/pixiv_urls.txt` (gitignored) and merge them with `scripts/merge_exports.py`.
+
+`scripts/collect_pixiv_windows.md` has the commands, the paste format, and the dedupe rules. A reviewed row is kept when the same artwork id is imported again.
 
 ## Rebuild
 
 From `scripts/`:
 
 ```bash
-python3 -m unittest test_safety.py
+python3 -m unittest test_safety.py test_home_collect.py
 python3 fetch_civitai.py
 python3 fetch_pixiv.py
 python3 build_catalog.py
 ```
 
-A fresh fetch changes the candidate pool. Do not replace `style_candidates.*` until the new rows have been reviewed. The scripts cache JSON under `scripts/.cache/` (gitignored) and do not take API keys.
+A fresh fetch changes the candidate pool. Do not replace `style_candidates.*` until the new rows have been reviewed. `fetch_civitai.py` also writes `catalog/civitai_adult_pending.*` (gitignored) for adult showcases that are not already in the reviewed catalog. The scripts cache JSON under `scripts/.cache/` (gitignored) and do not take API keys.

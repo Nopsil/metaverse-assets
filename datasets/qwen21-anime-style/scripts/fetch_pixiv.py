@@ -158,10 +158,10 @@ def probe_r18(refresh: bool) -> dict:
         "xrestrict_positive": len(restricted),
         "login_required": len(restricted) == 0,
         "todo": (
-            "Pixiv R-18 metadata needs a logged-in session. Do not paste cookies or "
-            "refresh tokens into this repo. A human can run a local session later and "
-            "pipe artwork IDs through scripts/safety.py before any URL is added to the "
-            "NSFW anatomy scaffold."
+            "Do not collect Pixiv R-18 from a US cloud VM. Public mode=r18 omits "
+            "restricted works, and Pixiv blocks many datacenter IPs. On a home Windows "
+            "PC run scripts/collect_pixiv_windows.py, or paste artwork URLs and run "
+            "scripts/merge_exports.py. Do not commit cookies."
         ),
     }
 

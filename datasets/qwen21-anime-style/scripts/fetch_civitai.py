@@ -7,6 +7,7 @@ Does not download image binaries. Prints a JSONL candidate file.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import re
 import sys
@@ -14,6 +15,7 @@ import urllib.parse
 from collections import Counter
 from pathlib import Path
 
+from build_catalog import write_outputs
 from http_cache import get_json
 from safety import has_person_signal, rating_for, screen, style_notes
 
@@ -31,15 +33,31 @@ SEARCHES = [
     {"types": "Checkpoint", "baseModels": "Illustrious", "sort": "Most Downloaded", "nsfw": "true", "limit": 12},
     {"types": "LORA", "query": "anime style", "baseModels": "Illustrious", "sort": "Highest Rated", "nsfw": "false", "limit": 10},
     {"types": "LORA", "query": "cel shading", "sort": "Highest Rated", "nsfw": "false", "limit": 8},
+    # Adult anime showcases. Latest galleries are often safe, so the fetcher
+    # also reads a second version and keeps adult rows ahead of all-ages ones.
+    {"types": "Checkpoint", "baseModels": "Illustrious", "sort": "Highest Rated", "nsfw": "true", "limit": 8},
+    {"types": "Checkpoint", "baseModels": "NoobAI", "sort": "Most Downloaded", "nsfw": "true", "limit": 8},
+    {"types": "Checkpoint", "baseModels": "Anima", "sort": "Most Downloaded", "nsfw": "true", "limit": 6},
+    {"types": "LORA", "baseModels": "Illustrious", "query": "style", "sort": "Most Downloaded", "nsfw": "true", "limit": 8},
 ]
 
 SKIP_MODEL = re.compile(
     r"(?i)\b(?:lolis?|shotas?|child|children|toddler|infant|teens?|schoolgirl|"
-    r"furry|pony|photoreal|realism|celebrity|underage|3dcg)\b"
+    r"furry|yiff|pony|photoreal|realism|realistic|celebrity|underage|3dcg)\b"
 )
 
 ID_RE = re.compile(r"/(\d+)\.(?:jpeg|jpg|png|webp)(?:\?|$)", re.I)
-MAX_PER_MODEL = 6
+ADULT_PER_MODEL = 4
+ALL_AGES_PER_MODEL = 2
+VERSIONS_PER_MODEL = 2
+ADULT_PENDING_CAP = 48
+ADULT_PENDING_PER_MODEL = 3
+# Thumbnail pass on 2026-09-26. Text filters let these through; the pictures did not.
+VISUAL_BLOCKLIST = {
+    "120481381",  # feet-only crop; age not readable
+    "40097834",  # Shantae; ambiguous age
+    "143422745",  # explicit frame whose figures read as youthful
+}
 MIN_SHORT = 768
 MIN_LONG = 1024
 
@@ -78,6 +96,26 @@ def long_short(width: int, height: int) -> tuple[int, int]:
     return max(width, height), min(width, height)
 
 
+def flag_true(value) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, str) and value.strip().lower() == "true":
+        return True
+    return False
+
+
+def cap_showcase_rows(
+    rows: list[dict],
+    *,
+    adult_cap: int = ADULT_PER_MODEL,
+    all_ages_cap: int = ALL_AGES_PER_MODEL,
+) -> list[dict]:
+    """Keep adult showcases first, then a few all-ages rows from the same model."""
+    adult = [row for row in rows if row.get("rating") == "adult"]
+    other = [row for row in rows if row.get("rating") != "adult"]
+    return adult[:adult_cap] + other[:all_ages_cap]
+
+
 def model_rows(refresh: bool) -> list[dict]:
     found: list[dict] = []
     seen: set[int] = set()
@@ -108,12 +146,16 @@ def model_rows(refresh: bool) -> list[dict]:
             if base.lower() in {"pony", "sd 1.5", "sd 2.1", "sd 2.1 768"}:
                 # Pony/MLP and old SD1.5 showcases are a poor match for this pass.
                 continue
+            version_ids = [v.get("id") for v in versions[:VERSIONS_PER_MODEL] if v.get("id")]
+            if not version_ids:
+                continue
             seen.add(mid)
             found.append(
                 {
                     "model_id": mid,
                     "model_name": name,
-                    "version_id": version.get("id"),
+                    "version_id": version_ids[0],
+                    "version_ids": version_ids,
                     "base_model": base,
                     "model_nsfw": bool(item.get("nsfw")),
                 }
@@ -122,9 +164,34 @@ def model_rows(refresh: bool) -> list[dict]:
 
 
 def candidates_from_version(model: dict, refresh: bool, dropped: Counter) -> list[dict]:
-    vid = model.get("version_id")
-    if not vid:
-        return []
+    version_ids = list(model.get("version_ids") or [])
+    if not version_ids and model.get("version_id"):
+        version_ids = [model.get("version_id")]
+    rows: list[dict] = []
+    seen_prompt: set[str] = set()
+    seen_ids: set[str] = set()
+    for vid in version_ids:
+        rows.extend(
+            _rows_from_one_version(
+                model,
+                vid,
+                refresh,
+                dropped,
+                seen_prompt,
+                seen_ids,
+            )
+        )
+    return cap_showcase_rows(rows)
+
+
+def _rows_from_one_version(
+    model: dict,
+    vid: int,
+    refresh: bool,
+    dropped: Counter,
+    seen_prompt: set[str],
+    seen_ids: set[str],
+) -> list[dict]:
     try:
         payload = get_json(f"{API}/model-versions/{vid}", refresh=refresh)
     except Exception as exc:  # noqa: BLE001
@@ -133,9 +200,14 @@ def candidates_from_version(model: dict, refresh: bool, dropped: Counter) -> lis
         return []
 
     base = payload.get("baseModel") or model.get("base_model") or ""
+    if str(base).lower() in {"pony", "sd 1.5", "sd 2.1", "sd 2.1 768"}:
+        dropped["base_skipped"] += 1
+        return []
     model_name = (payload.get("model") or {}).get("name") or model.get("model_name") or ""
+    if SKIP_MODEL.search(model_name):
+        dropped["model_name"] += 1
+        return []
     rows: list[dict] = []
-    seen_prompt: set[str] = set()
     for image in payload.get("images") or []:
         if image.get("type") not in (None, "image"):
             dropped["not_image"] += 1
@@ -148,6 +220,10 @@ def candidates_from_version(model: dict, refresh: bool, dropped: Counter) -> lis
         if not iid:
             dropped["no_id"] += 1
             continue
+        if iid in seen_ids:
+            dropped["dup_id"] += 1
+            continue
+        seen_ids.add(iid)
         width = int(image.get("width") or 0)
         height = int(image.get("height") or 0)
         long_edge, short_edge = long_short(width, height)
@@ -163,8 +239,8 @@ def candidates_from_version(model: dict, refresh: bool, dropped: Counter) -> lis
         ok, why = screen(
             prompt,
             tags,
-            minor_flag=image.get("minor"),
-            poi_flag=image.get("poi"),
+            minor_flag=flag_true(image.get("minor")),
+            poi_flag=flag_true(image.get("poi")),
         )
         if not ok:
             dropped[why] += 1
@@ -202,9 +278,62 @@ def candidates_from_version(model: dict, refresh: bool, dropped: Counter) -> lis
                 "screen": why,
             }
         )
-        if len(rows) >= MAX_PER_MODEL:
-            break
     return rows
+
+
+def load_catalog_ids(path: Path) -> set[str]:
+    if not path.exists():
+        return set()
+    ids: set[str] = set()
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            if row.get("id"):
+                ids.add(str(row["id"]))
+    return ids
+
+
+def adult_pending_rows(
+    rows: list[dict],
+    existing_ids: set[str],
+    *,
+    cap: int = ADULT_PENDING_CAP,
+    per_model: int = ADULT_PENDING_PER_MODEL,
+) -> list[dict]:
+    """Adult rows that are not already in the reviewed catalog."""
+    ordered = sorted(
+        (
+            row
+            for row in rows
+            if row.get("rating") == "adult" and str(row.get("id")) not in existing_ids
+        ),
+        key=lambda row: int(row.get("quality") or 0),
+        reverse=True,
+    )
+    picked: list[dict] = []
+    per: Counter = Counter()
+    seen: set[str] = set()
+    for row in ordered:
+        image_id_value = str(row["id"])
+        if image_id_value in seen or image_id_value in VISUAL_BLOCKLIST or image_id_value in existing_ids:
+            continue
+        model_id = str(row.get("model_id") or image_id_value)
+        if per[model_id] >= per_model:
+            continue
+        seen.add(image_id_value)
+        per[model_id] += 1
+        item = dict(row)
+        item["visual_review"] = "pending"
+        item["collected_via"] = "civitai_public_api"
+        item["keep_reason"] = (
+            "Metadata screen only on a public Civitai model-version prompt. "
+            "Not a thumbnail pass. Full-size human review is required before download or training. "
+            f"civitai adult; {item.get('width')}x{item.get('height')}; "
+            f"{item.get('model_name') or item.get('base_model') or 'civitai'}."
+        )
+        picked.append(item)
+        if len(picked) >= cap:
+            break
+    return picked
 
 
 def main() -> None:
@@ -215,6 +344,21 @@ def main() -> None:
         default=HERE.parent / "catalog" / "_civitai_candidates.jsonl",
     )
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument(
+        "--adult-pending-jsonl",
+        type=Path,
+        default=HERE.parent / "catalog" / "civitai_adult_pending.jsonl",
+    )
+    parser.add_argument(
+        "--adult-pending-csv",
+        type=Path,
+        default=HERE.parent / "catalog" / "civitai_adult_pending.csv",
+    )
+    parser.add_argument(
+        "--existing-catalog",
+        type=Path,
+        default=HERE.parent / "catalog" / "style_candidates.csv",
+    )
     args = parser.parse_args()
 
     dropped: Counter = Counter()
@@ -239,6 +383,11 @@ def main() -> None:
         "ratings": dict(Counter(r["rating"] for r in rows)),
         "dropped": dict(dropped),
     }
+    existing_ids = load_catalog_ids(args.existing_catalog)
+    pending = adult_pending_rows(rows, existing_ids)
+    write_outputs(pending, args.adult_pending_jsonl, args.adult_pending_csv)
+    summary["adult_pending"] = len(pending)
+    summary["adult_pending_new"] = len(pending)
     summary_path = args.out.with_suffix(".summary.json")
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))

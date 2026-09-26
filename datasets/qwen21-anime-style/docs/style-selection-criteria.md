@@ -19,12 +19,12 @@ Hard drop, even if the picture is otherwise pretty:
 
 - Any minor, underage, or ambiguous-age character. Stated age under 21. “Legal loli,” ロリババア, mesugaki, っ子.
 - School cues: uniforms, serafuku, gym clothes, high-school / middle-school / elementary tags, JK/JS/JC.
-- Child-coded or school-coded series and characters, including Vocaloid/Miku, Blue Archive, Precure, Touhou, Love Live, Jujutsu Kaisen, My Hero Academia, Evangelion, Madoka, Cardcaptor Sakura, Frieren, Genshin child designs, Violet Evergarden, Amiya, Tohsaka Rin, Umamusume, Kemono Friends, Medalist.
+- Child-coded or school-coded series and characters, including Vocaloid/Miku, Blue Archive, Precure, Touhou, Love Live, Jujutsu Kaisen, My Hero Academia, Evangelion, Madoka, Cardcaptor Sakura, Frieren, Genshin child designs, Violet Evergarden, Amiya, Tohsaka Rin, Umamusume, Kemono Friends, Medalist, Chainsaw Man, Konosuba, The Quintessential Quintuplets, Doki Doki Literature Club, Animal Crossing, and Shantae.
 - Chibi, super-deformed, and Q-version proportions.
 - Photoreal, DSLR, “ultra realistic,” furry, and My Little Pony / Pony Diffusion.
+- 3D character renders (`3d style`, `3d render`, `3dcg`). They pull the style off 2D anime.
 - Gore.
 - Comics and tutorials (multi-panel pages, 講座).
-- 3D character renders (they pull the style off 2D anime).
 - Civitai `minor` or `poi` flags. Pixiv `lo` flag.
 - Empty prompts on Civitai (no tags to screen).
 
@@ -43,7 +43,9 @@ Suggestive costume on a Pixiv safe-mode page stays `all-ages`.
 
 ## Diversity caps
 
-The builder keeps at most a few images per Pixiv artist and per Civitai model so one creator does not become the style. The reviewed snapshot is 88 rows (49 Pixiv, 39 Civitai; 72 all-ages, 16 adult).
+The builder keeps at most a few images per Pixiv artist and per Civitai model so one creator does not become the style. The reviewed snapshot is 116 rows (49 Pixiv, 67 Civitai; 72 all-ages, 44 adult).
+
+Home-exported Pixiv URLs are merged with `scripts/merge_exports.py`. The same artwork id is one row. A `thumbnail_pass` row is not replaced by a later paste of that id. URL-only pastes stay `rating=unreviewed` and `visual_review=pending` until someone opens the full image. See `scripts/collect_pixiv_windows.md`.
 
 ## Human review
 

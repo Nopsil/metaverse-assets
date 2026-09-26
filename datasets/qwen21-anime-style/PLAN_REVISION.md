@@ -21,4 +21,6 @@ The parent note split training into a mouth LoRA (A), an NSFW anatomy LoRA (B), 
 
 ## Data shape
 
-Style candidates live in `catalog/style_candidates.csv` (88 reviewed URLs). After a full-size pass, train on a diverse slice of that pool rather than on mouth crops alone. Anatomy still wants its own 150–300 reviewed adults before a B run. Caption rules are in `captions/README.md`.
+Style candidates live in `catalog/style_candidates.csv` (116 reviewed URLs). After a full-size pass, train on a diverse slice of that pool rather than on mouth crops alone. Anatomy still wants its own 150–300 reviewed adults before a B run. Caption rules are in `captions/README.md`.
+
+Pixiv R-18 is not collected on the US cloud box. Use `scripts/collect_pixiv_windows.md` on a home Windows Chrome profile, or paste artwork URLs and merge them. Do not commit cookies.
