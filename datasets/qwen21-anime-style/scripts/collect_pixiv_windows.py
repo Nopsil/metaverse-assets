@@ -468,10 +468,25 @@ def main() -> None:
             _exit(str(exc))
         print(json.dumps({"login": "closed", "dedicated_profile": str(profile)}))
         return
-    try:
-        rows, notes = run_browser(profile, proxy, args)
-    except RuntimeError as exc:
-        _exit(str(exc))
+    rows = None
+    notes = None
+    last_error: Exception | None = None
+    for attempt in range(2):
+        try:
+            rows, notes = run_browser(profile, proxy, args)
+            last_error = None
+            break
+        except RuntimeError as exc:
+            _exit(str(exc))
+        except Exception as exc:  # noqa: BLE001 - one retry when Chrome closes mid-search
+            last_error = exc
+            if attempt == 0 and "closed" in str(exc).lower():
+                print("Dedicated Chrome closed mid-search. Retrying once. Not touching any other Chrome.", file=sys.stderr)
+                time.sleep(3)
+                continue
+            raise
+    if last_error is not None or rows is None or notes is None:
+        _exit("Pixiv collect failed: " + str(last_error))
     write_export(rows, notes, args.out)
     print(json.dumps({"out": str(args.out), "dedicated_profile": str(profile), **notes}, ensure_ascii=False, indent=2))
 
