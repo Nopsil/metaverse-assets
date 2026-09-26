@@ -64,10 +64,46 @@ HOT_BODY_QUERIES = (
     ("slim", "スレンダー 全裸 お姉さん"),
     ("petite", "細身 お姉さん"),
     ("petite", "華奢 お姉さん"),
+    ("petite", "細身 人妻"),
+    ("petite", "華奢 人妻"),
+    ("petite", "細身 熟女"),
+    ("petite", "小柄 お姉さん"),
+    ("petite", "低身長 お姉さん"),
     ("petite", "細身 全裸 お姉さん"),
+    ("petite", "華奢 全裸 お姉さん"),
+    ("petite", "小柄 全裸 お姉さん"),
+    ("petite", "細身 貧乳 お姉さん"),
+    ("petite", "華奢 貧乳 お姉さん"),
+    ("petite", "小柄 貧乳 お姉さん"),
+    ("petite", "低身長 貧乳 お姉さん"),
+    ("petite", "細身 微乳 お姉さん"),
+    ("petite", "華奢 微乳 お姉さん"),
+    ("petite", "小柄 ちっぱい お姉さん"),
+    ("petite", "華奢 ちっぱい お姉さん"),
+    ("petite", "細身 無乳 お姉さん"),
+    ("petite", "小柄 人妻"),
+    ("petite", "低身長 人妻"),
+    ("petite", "華奢 熟女"),
+    ("petite", "低身長 女性"),
+    ("petite", "低身長 成人"),
+    ("flat", "スレンダー 微乳"),
+    ("flat", "スレンダー 貧乳"),
+    ("flat", "ちっぱい スレンダー"),
+    ("flat", "成人 貧乳"),
     ("flat", "貧乳 お姉さん"),
     ("flat", "微乳 お姉さん"),
+    ("flat", "貧乳 人妻"),
+    ("flat", "微乳 人妻"),
+    ("flat", "貧乳 熟女"),
+    ("flat", "微乳 熟女"),
+    ("flat", "ちっぱい お姉さん"),
+    ("flat", "ちっぱい 人妻"),
+    ("flat", "貧乳 女上司"),
+    ("flat", "無乳 お姉さん"),
+    ("flat", "スレンダー 貧乳 お姉さん"),
     ("flat", "貧乳 全裸 お姉さん"),
+    ("flat", "微乳 全裸 お姉さん"),
+    ("flat", "ちっぱい 全裸 お姉さん"),
 )
 HOT_BUCKETS = ("curvy", "average", "slim", "petite", "flat")
 THIN_BUCKETS = ("slim", "petite", "flat")
@@ -101,6 +137,27 @@ def thin_bucket_allowed(bucket: str, tags: list[str], title: str = "") -> bool:
     if bucket not in THIN_BUCKETS:
         return True
     return has_adult_setting(tags, title)
+
+
+# Large-chest tags do not fill petite or flat. A slim-and-busty figure stays in slim/curvy.
+_LARGE_CHEST = ("巨乳", "爆乳", "超乳", "デカパイ", "デカ乳", "でかぱい", "巨乳輪")
+_FLAT_MARKERS = ("貧乳", "微乳", "ちっぱい", "無乳")
+_PETITE_MARKERS = ("細身", "華奢", "小柄", "低身長", "貧乳", "微乳", "ちっぱい", "無乳")
+
+
+def small_body_ok(bucket: str, tags: list[str] | str, title: str = "") -> bool:
+    """Petite and flat rows must actually be small-framed or small-chested adults.
+
+    巨乳 / 爆乳 on those buckets is a mismatch. Flat also needs a small-chest tag.
+    """
+    if bucket not in {"petite", "flat"}:
+        return True
+    blobs = _text_blobs(tags, title)
+    blob = " ".join(blobs)
+    if any(word in blob for word in _LARGE_CHEST):
+        return False
+    markers = _FLAT_MARKERS if bucket == "flat" else _PETITE_MARKERS
+    return any(word in blob for word in markers)
 
 
 def canonical_order(order: str) -> str:
@@ -199,7 +256,7 @@ def is_rough_work(tags: list[str], title: str = "") -> bool:
         token = blob.strip()
         if not token:
             continue
-        if token in {"落書き", "下描き", "下書き", "練習", "練習絵", "作画崩壊"}:
+        if token in {"落書き", "らくがき", "下描き", "下書き", "練習", "練習絵", "作画崩壊"}:
             return True
         if "落書き" in token or "下描き" in token or "下書き" in token or "作画崩壊" in token:
             return True
@@ -276,6 +333,7 @@ def hot_search_url(
     end_date: str = "",
     order: str = "popular",
     min_bookmarks: int = 0,
+    exclude_ai: bool = True,
 ) -> str:
     from fetch_pixiv import search_url
 
@@ -292,6 +350,9 @@ def hot_search_url(
         end_date=req_end,
         artwork_type="illust",
         min_bookmarks=min_bookmarks,
+        exclude_ai=exclude_ai,
+        # Short edge of the size rule. wlt=1024 hides portrait originals whose width is under 1024.
+        min_width=768,
     )
 
 FetchJson = Callable[[str], dict]
@@ -569,6 +630,7 @@ def iter_hot_r18_search(
     order: str = "popular",
     min_bookmarks: int = 1000,
     queries: tuple[tuple[str, str], ...] | None = None,
+    skip_ids: set[str] | None = None,
 ) -> tuple[dict[str, list[dict]], dict]:
     """Popularity-sorted R-18 stubs, grouped by body bucket.
 
@@ -602,9 +664,17 @@ def iter_hot_r18_search(
         "search_bookmarks": [],
         "masked_queries": 0,
         "per_query": {},
+        "per_query_restricted": {},
+        "skipped": {},
     }
+    skipped: dict[str, int] = notes["skipped"]
+
+    def bump(reason: str) -> None:
+        skipped[reason] = int(skipped.get(reason) or 0) + 1
+
     for bucket, word in chosen:
         kept_for_query = 0
+        restricted_for_query = 0
         for page in range(1, pages + 1):
             payload = _fetch_hot_page(
                 fetch_json,
@@ -618,14 +688,25 @@ def iter_hot_r18_search(
             )
             data = _search_data(payload)
             if not data:
+                if "empty_sample" not in notes:
+                    body = payload.get("body") if isinstance(payload, dict) else None
+                    illust = body.get("illust") if isinstance(body, dict) else None
+                    notes["empty_sample"] = {
+                        "query": word,
+                        "error": payload.get("error") if isinstance(payload, dict) else None,
+                        "message": str((payload or {}).get("message") or "")[:200],
+                        "illust_keys": list(illust)[:8] if isinstance(illust, dict) else None,
+                        "total": (illust or {}).get("total") if isinstance(illust, dict) else None,
+                    }
                 break
             restricted_on_page = 0
             for item in data:
                 if not _restricted_illust(item):
                     continue
                 restricted_on_page += 1
+                restricted_for_query += 1
                 artwork_id = str(item.get("id") or "")
-                if not artwork_id or artwork_id in seen:
+                if not artwork_id or artwork_id in seen or artwork_id in (skip_ids or ()):
                     continue
                 tags = item.get("tags") or []
                 if isinstance(tags, str):
@@ -638,12 +719,27 @@ def iter_hot_r18_search(
                         tag_list.append(str(tag))
                 tag_list = [tag for tag in tag_list if tag]
                 title = str(item.get("title") or "")
+                try:
+                    ai_type = int(item.get("aiType") or 0)
+                except (TypeError, ValueError):
+                    ai_type = 0
+                if ai_type == 2:
+                    seen.add(artwork_id)
+                    notes["ai_stubs"] = int(notes.get("ai_stubs") or 0) + 1
+                    bump("ai")
+                    continue
                 if is_rough_work(tag_list, title) or is_busy_scene(tag_list, title):
+                    bump("rough_or_busy")
                     continue
                 ok, _why = screen(" ".join([title, *tag_list]), tag_list)
                 if not ok:
+                    bump("screen")
                     continue
                 if not thin_bucket_allowed(bucket, tag_list, title):
+                    bump("no_adult_setting")
+                    continue
+                if not small_body_ok(bucket, tag_list, title):
+                    bump("body_mismatch")
                     continue
                 day = create_day(str(item.get("createDate") or ""))
                 if dated and day and not in_date_window(day, start_date, end_date):
@@ -662,6 +758,7 @@ def iter_hot_r18_search(
                 notes["masked_queries"] += 1
                 break
         notes["per_query"][word] = kept_for_query
+        notes["per_query_restricted"][word] = restricted_for_query
     notes["stub_counts"] = {bucket: len(items) for bucket, items in groups.items()}
     notes["search_bookmark_summary"] = bookmark_summary(notes["search_bookmarks"])
     return groups, notes
@@ -679,6 +776,7 @@ def _fetch_hot_page(
     notes: dict,
 ) -> dict:
     use_floor = 0 if notes.get("blt_disabled") else min_bookmarks
+    use_ai_filter = not notes.get("ai_filter_disabled")
     url = hot_search_url(
         word,
         page,
@@ -686,6 +784,7 @@ def _fetch_hot_page(
         end_date=end_date,
         order=order,
         min_bookmarks=use_floor,
+        exclude_ai=use_ai_filter,
     )
     payload = fetch_json(url)
     if not payload.get("error"):
@@ -701,10 +800,28 @@ def _fetch_hot_page(
             end_date=end_date,
             order=order,
             min_bookmarks=0,
+            exclude_ai=use_ai_filter,
         )
         payload = fetch_json(url)
         if not payload.get("error"):
             return payload
+        message = str(payload.get("message") or message)
+    if use_ai_filter and not notes.get("ai_filter_disabled"):
+        notes["ai_filter_disabled"] = True
+        notes["ai_filter_retry"] = message
+        url = hot_search_url(
+            word,
+            page,
+            start_date=start_date,
+            end_date=end_date,
+            order=order,
+            min_bookmarks=0 if notes.get("blt_disabled") else min_bookmarks,
+            exclude_ai=False,
+        )
+        payload = fetch_json(url)
+        if not payload.get("error"):
+            return payload
+        message = str(payload.get("message") or message)
     raise RuntimeError(f"Pixiv search failed for {word!r}: {message}")
 
 

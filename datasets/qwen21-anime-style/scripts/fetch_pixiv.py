@@ -58,6 +58,8 @@ def search_url(
     end_date: str = "",
     artwork_type: str = "illustrations",
     min_bookmarks: int = 0,
+    exclude_ai: bool = False,
+    min_width: int = 1024,
 ) -> str:
     """Ajax illustration search. Defaults stay the public safe-mode call.
 
@@ -72,7 +74,7 @@ def search_url(
         "s_mode": "s_tag",
         "type": artwork_type,
         "lang": "en",
-        "wlt": 1024,
+        "wlt": min_width,
     }
     if start_date:
         params["scd"] = start_date
@@ -80,6 +82,9 @@ def search_url(
         params["ecd"] = end_date
     if min_bookmarks > 0:
         params["blt"] = min_bookmarks
+    # Pixiv ai_type=1 is "exclude AI-generated works". Human art stays.
+    if exclude_ai:
+        params["ai_type"] = 1
     return (
         "https://www.pixiv.net/ajax/search/illustrations/"
         f"{urllib.parse.quote(word)}?{urllib.parse.urlencode(params)}"
