@@ -1,0 +1,7 @@
+# Optional paste file for Pixiv artwork URLs.
+# One URL per line. Lines starting with # are ignored.
+# Copy this file to catalog/pixiv_urls.txt (gitignored) and fill it in on your PC.
+# Do not commit the filled-in list.
+#
+# https://www.pixiv.net/artworks/123456789
+# https://www.pixiv.net/en/artworks/123456789

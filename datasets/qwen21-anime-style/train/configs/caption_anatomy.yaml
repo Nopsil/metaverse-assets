@@ -1,0 +1,30 @@
+# AI-Toolkit Qwen3-VL captioner for the anatomy folder.
+# Same loader as caption_style.yaml. Different prompt. Do not point it
+# at the style images.
+
+---
+job: extension
+config:
+  name: "qwen21_caption_anatomy"
+  process:
+    - type: "Qwen3VLCaptioner"
+      device: cuda:0
+      caption:
+        model_name_or_path: "Qwen/Qwen3-VL-8B-Instruct"
+        extensions:
+          - jpg
+          - jpeg
+          - png
+          - webp
+        path_to_caption: "__DATASET_DIR__"
+        dtype: bf16
+        device: cuda:0
+        quantize: false
+        low_vram: false
+        caption_extension: txt
+        recaption: false
+        max_res: 1024
+        max_new_tokens: 192
+        thinking: false
+        batch_size: 1
+        caption_prompt: "Write one or two natural English sentences. Every person in the picture is an adult. Describe the pose, the camera distance, and the visible adult anatomy in plain words, including the join, limb separation, nipples, and fluids if they are visible. Do not name a character, series, artist, or age. Do not mention school or children. If anyone in the picture is not a clearly adult person, reply with only the word SKIP."

@@ -1,0 +1,87 @@
+# Qwen Image 2.1 adult-anatomy LoRA (track B). Separate file from the style LoRA.
+# Same base and arch as style_lora.yaml. Do not merge the datasets.
+# Rank is lower because the concept is narrower than a broad style.
+# Raise linear and linear_alpha to 32 only if joins stay mushy after a run.
+# Steps sit a little higher (still inside the toolkit 500-4000 band).
+# Empty folder: do not launch this until about 150-300 reviewed adults exist.
+#
+# H100 notes and the OOM ladder are the same as style_lora.yaml.
+# guidance_scale 1.0 is the Qwen Image 2.1 pipeline default. Do not copy
+# guidance 3 from the older Qwen-Image 24GB example.
+
+---
+job: extension
+config:
+  name: "qwen21_anatomy_v1"
+  process:
+    - type: "sd_trainer"
+      training_folder: "__OUTPUT_DIR__"
+      device: cuda:0
+      network:
+        type: "lora"
+        linear: 16
+        linear_alpha: 16
+      save:
+        dtype: float16
+        save_every: 250
+        max_step_saves_to_keep: 4
+        save_format: safetensors
+        push_to_hub: false
+      datasets:
+        - folder_path: "__DATASET_DIR__"
+          caption_ext: txt
+          caption_dropout_rate: 0.0
+          shuffle_tokens: false
+          flip_x: false
+          flip_y: false
+          buckets: true
+          bucket_tolerance: 32
+          resolution: [1024, 1280, 1536]
+          cache_latents_to_disk: true
+          cache_text_embeddings: true
+          num_workers: 0
+          cache_latents_num_workers: 2
+      train:
+        batch_size: 1
+        steps: 2500
+        gradient_accumulation: 2
+        train_unet: true
+        train_text_encoder: false
+        gradient_checkpointing: true
+        cache_text_embeddings: true
+        noise_scheduler: "flowmatch"
+        timestep_type: "sigmoid"
+        optimizer: "adamw8bit"
+        lr: 1.0e-4
+        dtype: bf16
+        seed: 26092755
+        skip_first_sample: true
+      logging:
+        use_wandb: false
+      model:
+        name_or_path: "Qwen/Qwen-Image-2.1"
+        extras_name_or_path: "Qwen/Qwen-Image-2.1"
+        arch: "qwen_image_2"
+        quantize: false
+        quantize_te: false
+        low_vram: false
+        layer_offloading: false
+        model_kwargs:
+          use_comfy_weights: false
+      sample:
+        sampler: "flowmatch"
+        sample_every: 250
+        width: 1024
+        height: 1024
+        prompts:
+          - "Side view of two adults, woman straddling in reverse cowgirl, clear vaginal penetration, erect penis inserted, two nipples, limbs separate, a little fluid at the join, anime cel shading, simple bedroom background."
+          - "Three-quarter rear view of two adults in doggy style, clear genital join, separable limbs, two nipples, anime cel shading, plain wall background."
+          - "Missionary, two adults, clear vaginal join, limbs separate, a little fluid, anime cel shading, simple bedroom background."
+        neg: ""
+        seed: 26092755
+        walk_seed: false
+        guidance_scale: 1.0
+        sample_steps: 28
+meta:
+  name: "[name]"
+  version: "1.0"

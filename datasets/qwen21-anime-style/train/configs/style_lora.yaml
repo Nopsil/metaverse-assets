@@ -1,0 +1,102 @@
+# Qwen Image 2.1 broad anime-style LoRA (track A).
+# Official base: Qwen/Qwen-Image-2.1. arch qwen_image_2 (not qwen_image).
+# AI-Toolkit has no config/examples file for this arch yet (main, 2026-09-26).
+# Shape follows config/examples/train_lora_qwen_image_24gb.yaml plus the
+# qwen_image_2 loader. If Ostris publishes a qwen_image_2 example, prefer
+# that file's rank and learning rate over the numbers below.
+#
+# This file does not start a GPU. render_configs.py fills the paths.
+# Run order: train/README.md
+#
+# H100 80GB starting point. Batch stays 1 so 1536 buckets do not OOM.
+# OOM ladder, in order:
+#   1. Keep batch_size: 1 and gradient_checkpointing: true.
+#   2. Drop 1536 from resolution.
+#   3. quantize: true, qtype: convrot8, quantize_te: true, qtype_te: convrot8,
+#      and model_kwargs.use_comfy_weights: true so the loader can attach the
+#      prequantized Comfy-Org int8 file instead of quantizing BF16 in memory.
+#   4. disable_sampling: true if the failure is in the sample pass.
+#   5. Leave layer_offloading off on an 80GB H100. That flag is the 12GB path.
+
+---
+job: extension
+config:
+  name: "qwen21_anime_style_v1"
+  process:
+    - type: "sd_trainer"
+      training_folder: "__OUTPUT_DIR__"
+      device: cuda:0
+      # No trigger_word. Cached text embeddings ignore it. The anchor phrase
+      # is written into each .txt by caption_originals.py --apply.
+      network:
+        type: "lora"
+        linear: 32
+        linear_alpha: 32
+      save:
+        dtype: float16
+        save_every: 250
+        max_step_saves_to_keep: 4
+        save_format: safetensors
+        push_to_hub: false
+      datasets:
+        - folder_path: "__DATASET_DIR__"
+          caption_ext: txt
+          caption_dropout_rate: 0.05
+          shuffle_tokens: false
+          flip_x: false
+          flip_y: false
+          buckets: true
+          bucket_tolerance: 32
+          resolution: [1024, 1280, 1536]
+          cache_latents_to_disk: true
+          cache_text_embeddings: true
+          num_workers: 0
+          cache_latents_num_workers: 2
+      train:
+        batch_size: 1
+        steps: 2000
+        gradient_accumulation: 2
+        train_unet: true
+        train_text_encoder: false
+        gradient_checkpointing: true
+        cache_text_embeddings: true
+        noise_scheduler: "flowmatch"
+        timestep_type: "sigmoid"
+        optimizer: "adamw8bit"
+        lr: 1.0e-4
+        dtype: bf16
+        seed: 26092755
+        skip_first_sample: true
+      logging:
+        use_wandb: false
+      model:
+        name_or_path: "Qwen/Qwen-Image-2.1"
+        extras_name_or_path: "Qwen/Qwen-Image-2.1"
+        arch: "qwen_image_2"
+        # quantize false + use_comfy_weights false loads official Diffusers BF16.
+        # The toolkit otherwise prefers a Comfy-Org pack (bf16, or int8 convrot
+        # when qtype is convrot8). See the OOM ladder at the top.
+        quantize: false
+        quantize_te: false
+        low_vram: false
+        layer_offloading: false
+        model_kwargs:
+          use_comfy_weights: false
+      sample:
+        sampler: "flowmatch"
+        sample_every: 250
+        width: 1024
+        height: 1024
+        prompts:
+          - "Anime illustration of an adult woman in three-quarter view, black armor and a red cloak, wind in her hair, calm expression, closed mouth, cel shading, clean lineart, dusk sky behind her."
+          - "Half-body anime portrait of an adult woman in a dark dress, looking at the viewer, small smile, slightly open mouth, soft rim light, thick painterly color, plain warm background."
+          - "Full-body anime illustration of an adult witch in a black gown, standing in profile, one hand raised, neutral mouth, high-contrast cel paint, night interior."
+          - "Full-body anime illustration of an adult man in a long coat, standing in three-quarter view, closed mouth, clean lineart, cel shading, night street."
+        neg: ""
+        seed: 26092755
+        walk_seed: false
+        guidance_scale: 1.0
+        sample_steps: 28
+meta:
+  name: "[name]"
+  version: "1.0"
