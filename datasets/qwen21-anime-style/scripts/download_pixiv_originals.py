@@ -20,7 +20,7 @@ from pathlib import Path
 from chrome_profile import default_dedicated_profile, validate_proxy
 from pixiv_browser import open_pixiv, require_windows
 from pixiv_home import pixiv_block_reason
-from pixiv_originals import MAX_ORIGINAL_PAGES, file_name, originals_for_illust
+from pixiv_originals import MAX_ORIGINAL_PAGES, bytes_match_original, file_name, originals_for_illust
 from pixiv_urls import parse_artwork_url
 
 HERE = Path(__file__).resolve().parent
@@ -79,8 +79,41 @@ def pixiv_targets(rows: list[dict]) -> list[dict]:
         if ref is None and source != "pixiv":
             continue
         seen.add(artwork_id)
-        targets.append({"id": artwork_id, "url": f"https://www.pixiv.net/artworks/{artwork_id}"})
+        targets.append(
+            {
+                "id": artwork_id,
+                "url": f"https://www.pixiv.net/artworks/{artwork_id}",
+                "visual_review": str(row.get("visual_review") or ""),
+            }
+        )
+    targets.sort(key=lambda item: 0 if item.get("visual_review") == "pending" else 1)
     return targets
+
+
+def profile_in_use(profile: Path) -> bool:
+    """True when another Chrome already has this dedicated profile open."""
+    marker = str(profile)
+    for name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+        if (profile / name).exists():
+            return True
+    try:
+        import subprocess
+
+        out = subprocess.check_output(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "Get-CimInstance Win32_Process -Filter \"Name = 'chrome.exe'\" | "
+                "Select-Object -ExpandProperty CommandLine",
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+        )
+    except Exception:
+        return False
+    return marker.lower() in (out or "").lower()
 
 
 def browser_json(page, url: str) -> dict:
@@ -105,18 +138,65 @@ def browser_json(page, url: str) -> dict:
     return json.loads(text)
 
 
-def save_original(page, url: str, dest: Path) -> str | None:
-    if dest.exists() and dest.stat().st_size > 0:
-        return None
-    response = page.request.get(url, headers={"Referer": "https://www.pixiv.net/"}, timeout=120000)
-    if response.status != 200:
-        return f"http_{response.status}"
-    ctype = (response.headers.get("content-type") or "").lower()
+def _fetch_image(page, url: str) -> tuple[int, bytes]:
+    response = page.request.get(
+        url,
+        headers={"Referer": "https://www.pixiv.net/", "Accept": "image/*,*/*"},
+        timeout=120000,
+    )
     data = response.body()
-    if "image/" not in ctype or data[:20].lstrip().lower().startswith(b"<"):
-        return "not_image"
+    final_url = str(response.url or "")
+    if response.status == 200 and bytes_match_original(data, 0, 0) is None and "/img-original/" in (final_url or url):
+        return response.status, data
+    if response.status == 200 and data[:2] == b"\xff\xd8":
+        return response.status, data
+    if response.status == 200 and data[:8] == b"\x89PNG\r\n\x1a\n":
+        return response.status, data
+    result = page.evaluate(
+        """async (url) => {
+            const res = await fetch(url, {
+                credentials: "include",
+                referrer: location.href,
+                headers: { "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8" }
+            });
+            const buf = new Uint8Array(await res.arrayBuffer());
+            const chunks = [];
+            const size = 8192;
+            for (let i = 0; i < buf.length; i += size) {
+                const slice = buf.subarray(i, Math.min(i + size, buf.length));
+                chunks.push(btoa(String.fromCharCode.apply(null, slice)));
+            }
+            return { status: res.status, chunks: chunks, finalUrl: res.url };
+        }""",
+        url,
+    )
+    import base64
+
+    status = int((result or {}).get("status") or 0)
+    final_url = str((result or {}).get("finalUrl") or "")
+    if "/img-original/" not in final_url and "/img-original/" not in url:
+        return status, b""
+    raw = b"".join(base64.b64decode(part) for part in ((result or {}).get("chunks") or []))
+    return status, raw
+
+
+def save_original(page, url: str, dest: Path, expect_w: int = 0, expect_h: int = 0) -> str | None:
+    if "/img-original/" not in (url or ""):
+        return "not_img_original"
+    if dest.exists() and dest.stat().st_size > 0:
+        if bytes_match_original(dest.read_bytes(), expect_w, expect_h) is None:
+            return None
+        dest.unlink()
+    status, data = _fetch_image(page, url)
+    if status != 200:
+        return f"http_{status}"
+    reason = bytes_match_original(data, expect_w, expect_h)
+    if reason:
+        return reason
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(data)
+    partial = dest.with_suffix(dest.suffix + ".part")
+    partial.write_bytes(data)
+    partial.replace(dest)
     return None
 
 
@@ -140,9 +220,11 @@ def download_one(page, target: dict, out_dir: Path) -> dict:
     if plan["skip"]:
         return {"id": artwork_id, "skip": plan["skip"], "files": []}
     saved: list[str] = []
+    sizes = plan.get("sizes") or []
     for index, url in enumerate(plan["urls"]):
+        expect_w, expect_h = sizes[index] if index < len(sizes) else (0, 0)
         dest = out_dir / file_name(artwork_id, index, url)
-        error = save_original(page, url, dest)
+        error = save_original(page, url, dest, expect_w, expect_h)
         if error:
             return {"id": artwork_id, "skip": error, "files": saved}
         saved.append(dest.name)
@@ -158,7 +240,7 @@ def main() -> None:
     parser.add_argument("--catalog", type=Path, default=HERE.parent / "catalog" / "style_candidates.jsonl")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--dedicated-profile", type=Path, default=None)
-    parser.add_argument("--proxy", default="")
+    parser.add_argument("--proxy", default="http://127.0.0.1:7890")
     parser.add_argument("--limit", type=int, default=0, help="Stop after this many Pixiv rows. 0 means all.")
     parser.add_argument("--headless", action="store_true")
     args = parser.parse_args()
@@ -170,6 +252,11 @@ def main() -> None:
         proxy = validate_proxy(args.proxy)
     except RuntimeError as exc:
         _exit(str(exc))
+    if profile_in_use(profile):
+        _exit(
+            "Dedicated Chrome profile is already open. Leaving it alone. Retry when that window is closed.",
+            code=3,
+        )
     if not args.catalog.exists():
         _exit(f"Catalog not found: {args.catalog}")
     targets = pixiv_targets(load_rows(args.catalog))

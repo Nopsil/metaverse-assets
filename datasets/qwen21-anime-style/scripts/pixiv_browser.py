@@ -25,13 +25,19 @@ def require_windows(what: str) -> None:
 
 
 def launch_dedicated(playwright, profile: Path, proxy: str, *, headless: bool = False):
+    proxy_server = validate_proxy(proxy)
     return playwright.chromium.launch_persistent_context(
         str(profile),
         channel="chrome",
         headless=headless,
-        proxy={"server": validate_proxy(proxy)},
+        proxy={"server": proxy_server},
         viewport={"width": 1280, "height": 900},
-        args=["--disable-blink-features=AutomationControlled"],
+        # Playwright's default --disable-features breaks Chrome login decryption.
+        ignore_default_args=["--disable-features"],
+        args=[
+            f"--proxy-server={proxy_server}",
+            "--disable-blink-features=AutomationControlled",
+        ],
     )
 
 

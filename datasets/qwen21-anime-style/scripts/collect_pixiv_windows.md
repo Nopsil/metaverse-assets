@@ -57,7 +57,7 @@ py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Use
 
 ### 3. Download img-original files
 
-The catalog stores artwork **page** URLs. `square1200` and `master1200` are thumbnails. The downloader opens each Pixiv page in the dedicated profile and saves `i.pximg.net/img-original/...` only.
+The catalog stores artwork **page** URLs. `square1200` and `master1200` are thumbnails. The downloader opens each Pixiv page in the dedicated profile and saves `i.pximg.net/img-original/...` only. Chrome is started with `--proxy-server=http://127.0.0.1:7890`. A saved file must match the pixel size Pixiv reports, so a thumbnail cannot be kept under an original name.
 
 ```bat
 py -3 download_pixiv_originals.py --catalog ../catalog/style_candidates.jsonl --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890

@@ -178,6 +178,30 @@ class OriginalUrlTest(unittest.TestCase):
         )
         self.assertEqual(blocked["urls"], [])
         self.assertTrue(blocked["skip"])
+        gore = originals_for_illust(
+            {
+                "title": "夜",
+                "illustType": 0,
+                "pageCount": 1,
+                "xRestrict": 2,
+                "tags": {"tags": [{"tag": "お姉さん"}]},
+                "urls": {"original": original},
+            }
+        )
+        self.assertEqual(gore["skip"], "r18g")
+        from pixiv_originals import bytes_match_original
+
+        jpeg = (
+            b"\xff\xd8\xff\xc0\x00\x11\x08"
+            + (2048).to_bytes(2, "big")
+            + (1536).to_bytes(2, "big")
+            + bytes([3])
+            + (b"\x01\x11\x00" * 3)
+            + b"\xff\xd9"
+        )
+        self.assertIsNone(bytes_match_original(jpeg, 1536, 2048))
+        self.assertIsNotNone(bytes_match_original(jpeg, 1200, 1200))
+        self.assertEqual(bytes_match_original(b"<html>nope</html>", 1536, 2048), "not_image")
 
     def test_targets_are_pixiv_pages(self):
         from download_pixiv_originals import pixiv_targets
