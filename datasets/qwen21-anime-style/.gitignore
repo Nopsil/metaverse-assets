@@ -17,6 +17,9 @@ catalog/_originals_anatomy/
 catalog/_originals_civitai/
 catalog/_originals_quarantine/
 catalog/quarantine/**/_originals/
+catalog/quarantine/**/_originals_*/
+catalog/_originals_apr_oct/
+catalog/_quarantine_pre_hot_rerank/
 images/
 train/data/
 train/output/

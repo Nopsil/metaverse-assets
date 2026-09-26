@@ -105,6 +105,10 @@ class StageTest(unittest.TestCase):
             assert_trainable_source(DATASET / "catalog" / "quarantine" / "poor-aesthetic-20260927" / "_originals")
         with self.assertRaises(SystemExit):
             assert_trainable_source(DATASET / "catalog" / "_originals")
+        with self.assertRaises(SystemExit):
+            assert_trainable_source(DATASET / "catalog" / "_originals_apr_oct")
+        with self.assertRaises(SystemExit):
+            assert_trainable_source(DATASET / "catalog" / "quarantine" / "pre-hot-rerank" / "_originals_apr_oct")
         assert_trainable_source(DATASET / "catalog" / "_originals_hot")
         assert_trainable_source(DATASET / "catalog" / "_originals_civitai")
 

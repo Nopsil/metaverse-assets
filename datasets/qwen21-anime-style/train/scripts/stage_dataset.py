@@ -16,14 +16,28 @@ from pathlib import Path
 from common import DATA_DIR, DATASET, IMAGE_EXTS, assert_data_dest, image_size, iter_images
 
 
+BLOCKED_ORIGINAL_DIRS = {
+    "_originals",
+    "_originals_apr_oct",
+    "_originals_hold",
+    "_originals_quarantine",
+    "_quarantine_pre_hot_rerank",
+    "pre-hot-rerank",
+    "poor-aesthetic-20260927",
+}
+
+
 def assert_trainable_source(source: Path) -> None:
-    """The previous aesthetic snapshot stays on disk and out of the train copy."""
+    """The pre-hot catalog and its originals stay on disk and out of the train copy."""
     parts = [part.lower() for part in source.resolve().parts]
-    if "quarantine" in parts or "_originals_quarantine" in parts:
-        raise SystemExit(f"Refusing train-unready quarantine: {source}")
-    if "_originals" in parts:
+    blocked = any(
+        "quarantine" in part or part.startswith("_quarantine") or "deprecated" in part or part in BLOCKED_ORIGINAL_DIRS
+        for part in parts
+    )
+    if blocked:
         raise SystemExit(
-            f"Refusing deprecated catalog/_originals: {source}. Stage catalog/_originals_hot after review."
+            f"Refusing train-unready originals: {source}. "
+            "Stage catalog/_originals_hot, catalog/_originals_civitai, or catalog/_originals_anatomy after review."
         )
 
 

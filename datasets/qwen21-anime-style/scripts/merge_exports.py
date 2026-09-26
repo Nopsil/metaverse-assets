@@ -182,11 +182,22 @@ def richness(row: dict) -> int:
     return score
 
 
+def is_train_unready(row: dict) -> bool:
+    """The pre-hot catalog stays on disk and must not re-enter the active list."""
+    status = str(row.get("status") or "").lower()
+    review = str(row.get("visual_review") or "")
+    pool = str(row.get("pool") or "")
+    return status == "deprecated" or review == "quarantine" or pool == "quarantine"
+
+
 def merge_rows(base: list[dict], incoming: list[dict]) -> tuple[list[dict], Counter]:
     stats: Counter = Counter()
     ordered: list[dict] = []
     index: dict[tuple[str, str], int] = {}
     for row in base:
+        if is_train_unready(row):
+            stats["deprecated_skipped"] += 1
+            continue
         key = dedupe_key(row)
         if not key[1]:
             stats["base_skipped"] += 1
@@ -199,6 +210,9 @@ def merge_rows(base: list[dict], incoming: list[dict]) -> tuple[list[dict], Coun
         stats["base"] += 1
 
     for raw in incoming:
+        if is_train_unready(raw):
+            stats["deprecated_skipped"] += 1
+            continue
         screened, reason = screen_incoming(raw)
         if screened is None:
             stats[f"dropped:{reason}"] += 1

@@ -60,13 +60,13 @@ py -3 collect_pixiv_windows.py --mode hot --limit 48 --pages 2 --order popular -
 
 Queries stay on adult fictional looks and are balanced across curvy, average, slim, petite, and flat. Child-coded, school, and under-21 text still drop. Sketches (`ラフ`, `落書き`, `下描き`) and `作画崩壊` drop before the detail fetch. A kept row is `pool=hot` and still needs a full-size look.
 
-The previous candidate table and its originals are already quarantined as train-unready. Do not merge them back in. Publish the hot export as the new candidate list, then download into `catalog/_originals_hot/` (gitignored). `stage_dataset.py` reads that folder and refuses `catalog/quarantine/` and `catalog/_originals`.
+The previous candidate table is `status=deprecated` under `catalog/quarantine/poor-aesthetic-20260927/`. Its originals and later rejected downloads are under `catalog/quarantine/pre-hot-rerank/`. Do not merge that table back in. Publish the hot export as the active list, then download into `catalog/_originals_hot/` (gitignored). `stage_dataset.py` refuses the quarantine folders and `catalog/_originals`.
 
 ```bat
 py -3 download_pixiv_originals.py --catalog ..\catalog\_pixiv_hot_export.jsonl --out ..\catalog\_originals_hot --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
 
-The downloader skips `visual_review=quarantine`. It still saves `img-original` only.
+The downloader skips `visual_review=quarantine`, `status=deprecated`, and `pool=quarantine`. It still saves `img-original` only.
 
 Both scripts pause at random between page opens (about 3.5–14 seconds, sometimes up to half a minute) and between full-size files of the same work (about 2–8 seconds). They do not burst requests. Use only the dedicated profile and the local proxy.
 
