@@ -29,7 +29,7 @@ The run also writes `catalog/civitai_adult_pending.csv` for adult rows that are 
 
 ## Pixiv on your Windows PC
 
-`collect_pixiv_windows.py` and `download_pixiv_originals.py` use a dedicated Playwright profile and `--proxy`. `--login` is once. The collector writes page URLs. The downloader saves `img-original` files under gitignored `catalog/_originals/`, skips ugoira, and keeps the first 3 stills of a multi-page work. The run order is `collect_pixiv_windows.md`.
+`collect_pixiv_windows.py` and `download_pixiv_originals.py` use a dedicated Playwright profile and `--proxy`. Never the system Chrome profile. `--login` is once. The collector writes page URLs. `--mode hot` with `--date-windows 7,30,90,180,365` is the popularity-rank pass (`order=popular_d`). The downloader saves `img-original` files under gitignored `catalog/_originals_hot/`, skips ugoira, and keeps the first 3 stills of a multi-page work. The previous candidate snapshot is train-unready under `catalog/quarantine/poor-aesthetic-20260927/`. The run order is `collect_pixiv_windows.md`.
 
 ```bat
 py -3 collect_pixiv_windows.py --login --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890

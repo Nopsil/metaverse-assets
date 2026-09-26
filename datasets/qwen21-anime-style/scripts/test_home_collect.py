@@ -295,6 +295,26 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(blocked, [])
 
 
+class FlexibleWindowTest(unittest.TestCase):
+    def test_shortest_window_wins_and_spans_stay_ordered(self):
+        from datetime import date
+
+        from pixiv_home import choose_window_days, flexible_keep_windows, parse_date_windows
+
+        spans = parse_date_windows("7,30,90,180,365")
+        self.assertEqual(spans, (7, 30, 90, 180, 365))
+        with self.assertRaises(RuntimeError):
+            parse_date_windows("365,7")
+        with self.assertRaises(RuntimeError):
+            parse_date_windows("3")
+        windows = flexible_keep_windows(date(2026, 9, 27), spans)
+        self.assertEqual(windows[0], (7, "2026-09-20", "2026-09-27"))
+        self.assertEqual(windows[-1][0], 365)
+        self.assertEqual(windows[-1][2], "2026-09-27")
+        self.assertEqual(choose_window_days({7: 4, 30: 48, 90: 80}, 40, spans), 30)
+        self.assertEqual(choose_window_days({7: 1, 30: 2, 365: 10}, 40, spans), 365)
+
+
 class HotSearchTest(unittest.TestCase):
     def test_popular_url_uses_padded_dates_and_bookmark_floor(self):
         from pixiv_home import canonical_order, hot_search_url, in_date_window

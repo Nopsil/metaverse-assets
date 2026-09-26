@@ -98,6 +98,16 @@ class StageTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             stage([Path("/tmp")], DATASET / "catalog", min_long=1, min_short=1)
 
+    def test_refuses_quarantine_and_deprecated_originals(self):
+        from stage_dataset import assert_trainable_source
+
+        with self.assertRaises(SystemExit):
+            assert_trainable_source(DATASET / "catalog" / "quarantine" / "poor-aesthetic-20260927" / "_originals")
+        with self.assertRaises(SystemExit):
+            assert_trainable_source(DATASET / "catalog" / "_originals")
+        assert_trainable_source(DATASET / "catalog" / "_originals_hot")
+        assert_trainable_source(DATASET / "catalog" / "_originals_civitai")
+
 
 class ConfigTest(unittest.TestCase):
     def test_templates_match_the_h100_defaults(self):

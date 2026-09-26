@@ -14,7 +14,8 @@ Metadata filters are not enough. 116 committed URLs had a thumbnail review on 20
 
 | Path | Role |
 | --- | --- |
-| `catalog/style_candidates.csv` | Style candidates (117 URLs: 116 thumbnail_pass, 1 pending). |
+| `catalog/quarantine/poor-aesthetic-20260927/` | Previous candidate table. Train-unready. Kept for audit. |
+| `catalog/style_candidates.csv` | Active style candidates after the popularity-ranked collect. |
 | `catalog/style_candidates.jsonl` | Same rows, plus fields used by the scripts. |
 | `catalog/nsfw_anatomy_scaffold.csv` | Header only. Anatomy set is not populated. |
 | `catalog/pixiv_r18_probe.json` | Public R-18 search does not return restricted works. |

@@ -25,7 +25,7 @@ from pixiv_urls import parse_artwork_url
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[2]
-DEFAULT_OUT = HERE.parent / "catalog" / "_originals"
+DEFAULT_OUT = HERE.parent / "catalog" / "_originals_hot"
 
 
 def _exit(message: str, code: int = 2) -> None:
@@ -35,7 +35,11 @@ def _exit(message: str, code: int = 2) -> None:
 
 def assert_originals_dir(path: Path) -> None:
     resolved = path.resolve()
+    parts = [part.lower() for part in resolved.parts]
+    if "quarantine" in parts:
+        _exit("Refusing to save originals into the train-unready quarantine.")
     allowed = (
+        (HERE.parent / "catalog" / "_originals_hot").resolve(),
         (HERE.parent / "catalog" / "_originals").resolve(),
         (HERE.parent / "images").resolve(),
     )
@@ -43,7 +47,7 @@ def assert_originals_dir(path: Path) -> None:
         return
     repo = REPO_ROOT.resolve()
     if resolved == repo or repo in resolved.parents:
-        _exit("Refusing to save originals inside the repo except catalog/_originals or images/.")
+        _exit("Refusing to save originals inside the repo except catalog/_originals_hot, catalog/_originals, or images/.")
 
 
 def load_rows(path: Path) -> list[dict]:
@@ -93,11 +97,12 @@ def pixiv_targets(rows: list[dict]) -> list[dict]:
 
 
 def profile_in_use(profile: Path) -> bool:
-    """True when another Chrome already has this dedicated profile open."""
-    marker = str(profile)
-    for name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
-        if (profile / name).exists():
-            return True
+    """True when another Chrome already has this dedicated profile open.
+
+    A stale lock file is not enough: the user's main Chrome must stay up, and
+    a leftover SingletonLock must not block a free dedicated profile.
+    """
+    marker = str(profile).lower()
     try:
         import subprocess
 
@@ -114,8 +119,24 @@ def profile_in_use(profile: Path) -> bool:
             timeout=30,
         )
     except Exception:
-        return False
-    return marker.lower() in (out or "").lower()
+        return any((profile / name).exists() for name in ("SingletonLock", "SingletonCookie", "SingletonSocket"))
+    return marker in (out or "").lower()
+
+
+def wait_for_profile(profile: Path, timeout_s: int = 900) -> None:
+    """Wait if another agent has the dedicated profile. Do not kill Chrome."""
+    started = time.time()
+    announced = False
+    while profile_in_use(profile):
+        if not announced:
+            print(
+                "Dedicated Pixiv Chrome profile is already open. Waiting. Not closing any Chrome window.",
+                file=sys.stderr,
+            )
+            announced = True
+        if time.time() - started > timeout_s:
+            _exit("Dedicated profile is still open. Left that Chrome window alone.", code=3)
+        time.sleep(15)
 
 
 def browser_json(page, url: str) -> dict:
@@ -274,11 +295,7 @@ def main() -> None:
         proxy = validate_proxy(args.proxy)
     except RuntimeError as exc:
         _exit(str(exc))
-    if profile_in_use(profile):
-        _exit(
-            "Dedicated Chrome profile is already open. Leaving it alone. Retry when that window is closed.",
-            code=3,
-        )
+    wait_for_profile(profile)
     if not args.catalog.exists():
         _exit(f"Catalog not found: {args.catalog}")
     targets = pixiv_targets(load_rows(args.catalog))

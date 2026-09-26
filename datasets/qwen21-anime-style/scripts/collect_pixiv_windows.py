@@ -16,11 +16,12 @@ import json
 import sys
 import time
 from collections import Counter
+from datetime import date
 from pathlib import Path
 
 from chrome_profile import default_dedicated_profile, validate_proxy
+from download_pixiv_originals import wait_for_profile
 from pixiv_browser import open_pixiv, require_windows
-from download_pixiv_originals import profile_in_use
 from pixiv_home import (
     ADULT_R18_QUERIES,
     HOT_BODY_QUERIES,
@@ -31,11 +32,13 @@ from pixiv_home import (
     bookmark_summary,
     collect_rows_from_stubs,
     create_day,
+    flexible_keep_windows,
     hot_query_texts,
     in_date_window,
     iter_bookmark_works,
     iter_hot_r18_search,
     iter_r18_search,
+    parse_date_windows,
     pixiv_block_reason,
     queries_for_body,
     select_hot_rows,
@@ -143,6 +146,8 @@ def scrape(page, args) -> tuple[list[dict], dict]:
         notes["r18_masked_queries"] = masked
         stubs.extend(found)
     if args.mode == "hot":
+        if getattr(args, "date_windows", ""):
+            return _scrape_flexible_hot(fetch_json, args, dropped, notes)
         groups, search_notes = iter_hot_r18_search(
             fetch_json,
             pages=args.pages,
@@ -171,6 +176,92 @@ def scrape(page, args) -> tuple[list[dict], dict]:
             "or Pixiv is still masking R-18. No safe-mode stand-ins were saved as R-18."
         )
     return rows, notes
+
+
+def _scrape_flexible_hot(fetch_json, args, dropped: Counter, notes: dict) -> tuple[list[dict], dict]:
+    """Popularity rank inside the shortest window that fills --limit.
+
+    Tries 7 days, then 30, 90, 180, and 365 (or whatever --date-windows lists).
+    A shorter window is searched only for stubs. Detail pages are fetched once
+    the stub count can fill the list, or on the longest window.
+    """
+    spans = parse_date_windows(args.date_windows)
+    windows = flexible_keep_windows(date.today(), spans)
+    notes["order"] = "popular_d"
+    notes["strategy"] = "popular_d membership rank; shortest date window that fills the list"
+    notes["window_attempts"] = []
+    excluded = _excluded_ids(getattr(args, "exclude", None))
+    chosen: list[dict] = []
+    for days, start, end in windows:
+        groups, search_notes = iter_hot_r18_search(
+            fetch_json,
+            pages=args.pages,
+            start_date=start,
+            end_date=end,
+            order=args.order,
+            min_bookmarks=args.min_bookmarks,
+        )
+        stub_count = sum(len(items) for items in groups.values())
+        attempt = {
+            "days": days,
+            "start": start,
+            "end": end,
+            "stubs": stub_count,
+            "bookmark_floor": args.min_bookmarks,
+            "order_sent": search_notes.get("order_sent"),
+        }
+        notes["window_attempts"].append(attempt)
+        if stub_count < args.limit and days != spans[-1]:
+            continue
+        args.start_date = start
+        args.end_date = end
+        notes.update(search_notes)
+        stubs = _hot_detail_stubs(groups, detail_limit=max(args.limit * 4, args.limit))
+        notes["detail_stubs"] = len(stubs)
+        rows = collect_rows_from_stubs(
+            stubs,
+            fetch_json,
+            include_ai=args.include_ai,
+            dropped=dropped,
+            delay_s=0.35,
+        )
+        rows = _finish_hot_rows(rows, stubs, args, dropped, notes)
+        if excluded:
+            before = len(rows)
+            rows = [row for row in rows if str(row.get("id") or "") not in excluded]
+            dropped["excluded_previous"] += before - len(rows)
+        chosen = rows
+        notes["date_window_days"] = days
+        notes["date_start"] = start
+        notes["date_end"] = end
+        if len(chosen) >= args.limit:
+            break
+    notes["dropped"] = dict(dropped)
+    notes["rows"] = len(chosen)
+    notes["bookmark_strategy"] = (
+        f"order=popular_d with bookmark floor {args.min_bookmarks}; "
+        f"not the user bookmark list; window {notes.get('date_window_days')} days "
+        f"({notes.get('date_start')}..{notes.get('date_end')})"
+    )
+    return chosen, notes
+
+
+def _excluded_ids(path: Path | None) -> set[str]:
+    if path is None or not Path(path).exists():
+        return set()
+    ids: set[str] = set()
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        artwork_id = str(row.get("id") or "")
+        if artwork_id.isdigit():
+            ids.add(artwork_id)
+    return ids
 
 
 def _hot_detail_stubs(groups: dict[str, list[dict]], *, detail_limit: int) -> list[dict]:
@@ -256,11 +347,7 @@ def _finish_hot_rows(rows, stubs, args, dropped: Counter, notes: dict) -> list[d
 
 
 def run_browser(profile: Path, proxy: str, args) -> tuple[list[dict], dict]:
-    if profile_in_use(profile):
-        _exit(
-            "The dedicated Chrome profile is already open. Close that window and rerun. "
-            "Do not use the system Chrome profile."
-        )
+    wait_for_profile(profile)
     playwright, context = open_pixiv(profile, proxy, REPO_ROOT, headless=args.headless)
     page = context.pages[0] if context.pages else context.new_page()
     try:
@@ -321,6 +408,17 @@ def main() -> None:
     )
     parser.add_argument("--start-date", default=HOT_KEEP_START, help="Inclusive keep-window start, YYYY-MM-DD.")
     parser.add_argument("--end-date", default=HOT_KEEP_END, help="Inclusive keep-window end, YYYY-MM-DD.")
+    parser.add_argument(
+        "--date-windows",
+        default="",
+        help="Hot mode: shortest-first day spans, for example 7,30,90,180,365. Overrides --start-date.",
+    )
+    parser.add_argument(
+        "--exclude",
+        type=Path,
+        default=None,
+        help="JSONL of artwork ids to skip, such as the quarantined catalog.",
+    )
     parser.add_argument(
         "--min-bookmarks",
         type=int,

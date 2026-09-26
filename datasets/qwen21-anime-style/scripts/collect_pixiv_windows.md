@@ -48,15 +48,22 @@ py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Use
 py -3 collect_pixiv_windows.py --mode hot --limit 40 --pages 2 --order popular --start-date 2026-04-01 --end-date 2026-10-31 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
 ```
 
-`--mode hot` searches logged-in R-18 illustrations with `order=popular_d` (the `popular` / 人気 sort). The keep window is 2026-04-01 through 2026-10-31 inclusive. Pixiv's `scd` and `ecd` are after/before, so the request uses 2026-03-31 and 2026-11-01 and the script drops anything outside the inclusive window. `blt` is the bookmark floor when the membership accepts it.
+`--mode hot` searches logged-in R-18 illustrations with `order=popular_d` (the `popular` / 人気 sort). It does not read the user bookmark list. Pixiv's `scd` and `ecd` are after/before, so each request is padded by one day and rows outside the inclusive window are dropped. `blt` is the bookmark floor when the membership accepts it.
+
+Prefer a flexible window. The collector tries the shortest span that still fills `--limit`:
+
+```bat
+py -3 collect_pixiv_windows.py --mode hot --limit 48 --pages 2 --order popular --date-windows 7,30,90,180,365 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --exclude ..\catalog\quarantine\poor-aesthetic-20260927\style_candidates.jsonl --out ..\catalog\_pixiv_hot_export.jsonl
+```
+
+`--date-windows` overrides `--start-date` / `--end-date`. The fixed window `2026-04-01` through `2026-10-31` remains available when you pass those dates and omit `--date-windows`.
 
 Queries stay on adult fictional looks and are balanced across curvy, average, slim, petite, and flat. Child-coded, school, and under-21 text still drop. Sketches (`ラフ`, `落書き`, `下描き`) and `作画崩壊` drop before the detail fetch. A kept row is `pool=hot` and still needs a full-size look.
 
-Merge, then mark older Pixiv rows under the same bookmark floor so they are not train-ready. That moves their files from `catalog/_originals/` to gitignored `catalog/_originals_quarantine/` when the files are already on disk. High-bookmark rows stay.
+The previous candidate table and its originals are already quarantined as train-unready. Do not merge them back in. Publish the hot export as the new candidate list, then download into `catalog/_originals_hot/` (gitignored). `stage_dataset.py` reads that folder and refuses `catalog/quarantine/` and `catalog/_originals`.
 
 ```bat
-py -3 merge_exports.py --import ..\catalog\_pixiv_hot_export.jsonl --apply --quarantine-pixiv-below 1000
-py -3 download_pixiv_originals.py --catalog ..\catalog\_pixiv_hot_export.jsonl --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
+py -3 download_pixiv_originals.py --catalog ..\catalog\_pixiv_hot_export.jsonl --out ..\catalog\_originals_hot --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
 
 The downloader skips `visual_review=quarantine`. It still saves `img-original` only.
@@ -69,8 +76,10 @@ The downloader skips `visual_review=quarantine`. It still saves `img-original` o
 | `--user-id 123456` | Numeric id from `https://www.pixiv.net/users/123456`, if the page does not show one. |
 | `--mode bookmarks` | Public bookmarks only. |
 | `--mode r18` | Allowlisted R-18 searches only. |
-| `--mode hot` | Popular R-18 search for 2026-04-01 through 2026-10-31. Sends `order=popular_d` (`--order popular`). |
-| `--start-date` / `--end-date` | Inclusive posting window. Default `2026-04-01` `2026-10-31`. The request pads one day because Pixiv's `scd` / `ecd` are after / before. |
+| `--mode hot` | Popular R-18 search. Sends `order=popular_d` (`--order popular`). |
+| `--date-windows` | Shortest-first day spans, such as `7,30,90,180,365`. Stops at the first span that fills `--limit`. |
+| `--start-date` / `--end-date` | Inclusive posting window when `--date-windows` is omitted. Default `2026-04-01` `2026-10-31`. The request pads one day because Pixiv's `scd` / `ecd` are after / before. |
+| `--exclude` | JSONL whose artwork ids are skipped. Use the quarantined candidate file. |
 | `--min-bookmarks` | Hot-mode floor, default 1000, sent as `blt` when the membership allows it. |
 | `--include-private` | Also read private bookmarks. They stay in the gitignored export unless you merge them. |
 | `--include-ai` | Keep works Pixiv has labeled as AI. Off by default. |

@@ -1,8 +1,9 @@
 """Copy reviewed full-size images into the gitignored training folders.
 
-Does not download, caption, or train. Pixiv originals already live in
-catalog/_originals/ after download_pixiv_originals.py. Civitai full-size
-files and anatomy stills are separate folders you pass with --src.
+Does not download, caption, or train. New Pixiv originals live in
+catalog/_originals_hot/ after download_pixiv_originals.py. The old
+catalog/_originals/ tree and catalog/quarantine/ are train-unready.
+Civitai full-size files and anatomy stills are separate folders you pass with --src.
 """
 
 from __future__ import annotations
@@ -15,6 +16,17 @@ from pathlib import Path
 from common import DATA_DIR, DATASET, IMAGE_EXTS, assert_data_dest, image_size, iter_images
 
 
+def assert_trainable_source(source: Path) -> None:
+    """The previous aesthetic snapshot stays on disk and out of the train copy."""
+    parts = [part.lower() for part in source.resolve().parts]
+    if "quarantine" in parts or "_originals_quarantine" in parts:
+        raise SystemExit(f"Refusing train-unready quarantine: {source}")
+    if "_originals" in parts:
+        raise SystemExit(
+            f"Refusing deprecated catalog/_originals: {source}. Stage catalog/_originals_hot after review."
+        )
+
+
 def stage(
     sources: list[Path],
     dest: Path,
@@ -22,6 +34,8 @@ def stage(
     min_long: int = 1024,
     min_short: int = 768,
 ) -> dict:
+    for source in sources:
+        assert_trainable_source(source)
     assert_data_dest(dest)
     dest.mkdir(parents=True, exist_ok=True)
     copied = 0
@@ -80,7 +94,7 @@ def main() -> None:
     if args.src:
         sources = args.src
     elif args.track == "style":
-        sources = [DATASET / "catalog" / "_originals", DATASET / "catalog" / "_originals_civitai"]
+        sources = [DATASET / "catalog" / "_originals_hot", DATASET / "catalog" / "_originals_civitai"]
     else:
         sources = [DATASET / "catalog" / "_originals_anatomy"]
     dest = args.dest or (DATA_DIR / args.track)

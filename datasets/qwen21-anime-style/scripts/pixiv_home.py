@@ -34,23 +34,6 @@ PETITE_ADULT_QUERIES = [
     "貧乳 お姉さん オリジナル",
 ]
 
-# All-ages popularity searches for adult original illustrations. Same screen
-# as the R-18 allowlist. These are not a child search.
-AESTHETIC_SAFE_QUERIES = [
-    "厚塗り オリジナル 女性",
-    "アニメ塗り オリジナル 女性",
-    "清楚 お姉さん オリジナル",
-    "ファンタジー 女性 オリジナル",
-    "着物 女性 オリジナル",
-    "魔女 女性 オリジナル",
-]
-
-# Shortest window that still fills the list wins. Widens only when the
-# safety screen and bookmark floor leave too few works.
-POPULAR_WINDOW_DAYS = (7, 30, 90, 180, 365)
-POPULAR_ORDER = "popular_d"
-BOOKMARK_FLOOR = {7: 30, 30: 80, 90: 150, 180: 300, 365: 500}
-
 
 def queries_for_body(which: str) -> list[str]:
     """mature keeps the older allowlist. petite is the underrepresented adult set."""
@@ -61,99 +44,6 @@ def queries_for_body(which: str) -> list[str]:
     if which == "all":
         return list(ADULT_R18_QUERIES) + list(PETITE_ADULT_QUERIES)
     raise RuntimeError(f"Unknown body set {which!r}")
-
-
-def popular_query_plan(which: str = "all") -> list[tuple[str, str, str]]:
-    """(search words, body bucket, pixiv mode). Popularity rank, not bookmarks."""
-    plan: list[tuple[str, str, str]] = []
-    if which in {"all", "mature"}:
-        plan.extend((word, "mature", "r18") for word in ADULT_R18_QUERIES)
-    if which in {"all", "petite"}:
-        plan.extend((word, "petite", "r18") for word in PETITE_ADULT_QUERIES)
-    if which in {"all", "aesthetic"}:
-        plan.extend((word, "aesthetic", "safe") for word in AESTHETIC_SAFE_QUERIES)
-    if not plan:
-        raise RuntimeError(f"Unknown body set {which!r}")
-    validate_queries([word for word, _bucket, _mode in plan])
-    return plan
-
-
-def window_dates(today: date, days: int) -> tuple[str, str]:
-    if not 1 <= int(days) <= 366:
-        raise RuntimeError(f"Date window must be 1–366 days, got {days}")
-    start = today - timedelta(days=int(days))
-    return start.isoformat(), today.isoformat()
-
-
-def choose_popular_window(
-    passing_counts: dict[int, int],
-    target: int,
-    windows: tuple[int, ...] = POPULAR_WINDOW_DAYS,
-) -> int:
-    """Shortest window that reached the target. Otherwise the longest one."""
-    chosen = windows[-1]
-    for days in windows:
-        chosen = days
-        if int(passing_counts.get(days) or 0) >= target:
-            return days
-    return chosen
-
-
-def bookmark_floor(days: int) -> int:
-    if days in BOOKMARK_FLOOR:
-        return BOOKMARK_FLOOR[days]
-    known = [item for item in POPULAR_WINDOW_DAYS if item <= days]
-    if not known:
-        return BOOKMARK_FLOOR[POPULAR_WINDOW_DAYS[0]]
-    return BOOKMARK_FLOOR[known[-1]]
-
-
-def popular_search_url(word: str, page: int, *, mode: str, start: str, end: str, endpoint: str = "illustrations") -> str:
-    """Membership popularity rank inside a date window. Not date_d, not bookmarks."""
-    if endpoint not in {"illustrations", "artworks"}:
-        raise RuntimeError(f"Unknown Pixiv search endpoint {endpoint!r}")
-    params = {
-        "word": word,
-        "order": POPULAR_ORDER,
-        "mode": mode,
-        "p": page,
-        "csw": 0,
-        "s_mode": "s_tag",
-        "type": "illustrations" if endpoint == "illustrations" else "illust",
-        "lang": "ja",
-        "wlt": 1024,
-        "scd": start,
-        "ecd": end,
-    }
-    return (
-        f"https://www.pixiv.net/ajax/search/{endpoint}/"
-        f"{urllib.parse.quote(word)}?{urllib.parse.urlencode(params)}"
-    )
-
-
-def premium_block_reason(payload: dict) -> str | None:
-    if not isinstance(payload, dict):
-        return None
-    message = str(payload.get("message") or "")
-    if "プレミアム" in message or "premium" in message.lower():
-        return "premium_required"
-    body = payload.get("body")
-    if isinstance(body, dict):
-        nested = str(body.get("message") or "")
-        if "プレミアム" in nested or "premium" in nested.lower():
-            return "premium_required"
-    return None
-
-
-def illust_data(payload: dict) -> list:
-    body = payload.get("body") if isinstance(payload, dict) else None
-    if not isinstance(body, dict):
-        return []
-    for key in ("illust", "illustManga"):
-        block = body.get(key) or {}
-        if isinstance(block, dict) and isinstance(block.get("data"), list):
-            return block["data"]
-    return []
 
 
 # Popular R-18 originals in a posting window. Each line still has to pass
@@ -214,6 +104,43 @@ def in_date_window(day: str, start_date: str, end_date: str) -> bool:
     if not day or not _DAY_RE.match(day):
         return False
     return require_day(start_date) <= day <= require_day(end_date)
+
+
+# Shortest span that still fills the hot list. 7 days through 1 year.
+FLEXIBLE_WINDOW_DAYS = (7, 30, 90, 180, 365)
+
+
+def parse_date_windows(text: str) -> tuple[int, ...]:
+    """Comma-separated day spans, shortest first, each between 7 and 366."""
+    days = tuple(int(part.strip()) for part in (text or "").split(",") if part.strip())
+    if not days:
+        raise RuntimeError("Pass --date-windows like 7,30,90,180,365")
+    if any(day < 7 or day > 366 for day in days):
+        raise RuntimeError("Each date window must be 7–366 days")
+    if list(days) != sorted(days):
+        raise RuntimeError("Date windows must be shortest first")
+    return days
+
+
+def flexible_keep_windows(today, days_list: tuple[int, ...] = FLEXIBLE_WINDOW_DAYS) -> list[tuple[int, str, str]]:
+    """(span_days, inclusive start, inclusive end) ending on today, shortest first."""
+    from datetime import timedelta
+
+    windows = []
+    for days in parse_date_windows(",".join(str(day) for day in days_list)):
+        start = today - timedelta(days=days)
+        windows.append((days, start.isoformat(), today.isoformat()))
+    return windows
+
+
+def choose_window_days(stub_counts: dict[int, int], target: int, windows: tuple[int, ...]) -> int:
+    """Shortest span whose search stubs can fill the list. Else the longest."""
+    chosen = windows[-1]
+    for days in windows:
+        chosen = days
+        if int(stub_counts.get(days) or 0) >= target:
+            return days
+    return chosen
 
 
 def bookmark_count(item: dict) -> int | None:
@@ -366,13 +293,7 @@ def illust_tags(body: dict) -> list[str]:
     return tags
 
 
-def row_from_illust_body(
-    body: dict,
-    *,
-    include_ai: bool = False,
-    search_bucket: str = "",
-    date_window_days: int = 0,
-) -> tuple[dict | None, str]:
+def row_from_illust_body(body: dict, *, include_ai: bool = False) -> tuple[dict | None, str]:
     """Turn one illust ajax body into a catalog row, or (None, reason)."""
     if not isinstance(body, dict) or not body or body.get("isMasked"):
         return None, "masked"
