@@ -13,3 +13,4 @@ This project only produces content about fictional characters. Fictional charact
 - 默认所有虚构角色均视为已成年。
 - 禁止生成真人 / 真实未成年人的 NSFW。
 - 虚构成人向 NSFW 不以身材比例单独否决。
+- 成人体型需多样：除成熟丰满外，须纳入娇小、纤细、平胸等成年向体型；不得因身材偏小就当未成年剔除，也不得只收集成熟体型。
