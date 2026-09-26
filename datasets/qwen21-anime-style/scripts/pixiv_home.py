@@ -46,22 +46,28 @@ def queries_for_body(which: str) -> list[str]:
     raise RuntimeError(f"Unknown body set {which!r}")
 
 
-# 2026-04-01..2026-10-31 is only an example window. Hot collection widens
-# 7 / 30 / 90 / 180 / 365 days when a shorter span is too thin.
+# A posting window is optional. Popularity rank (order=popular_d) is the default.
+# 2026-04-01..2026-10-31 is only an example when the caller passes dates.
 # Child-coded, school, and under-21 words are not searched.
+# Nude queries sit beside the body queries so a simple adult silhouette can rank.
 HOT_KEEP_START = "2026-04-01"
 HOT_KEEP_END = "2026-10-31"
 HOT_BODY_QUERIES = (
     ("curvy", "巨乳 女性 オリジナル"),
+    ("curvy", "巨乳 全裸 オリジナル"),
     ("average", "お姉さん オリジナル"),
     ("average", "普通体型 女性 オリジナル"),
+    ("average", "全裸 お姉さん"),
     ("slim", "スレンダー お姉さん"),
     ("slim", "スレンダー 人妻"),
     ("slim", "スレンダー 熟女"),
+    ("slim", "スレンダー 全裸 お姉さん"),
     ("petite", "細身 お姉さん"),
     ("petite", "華奢 お姉さん"),
+    ("petite", "細身 全裸 お姉さん"),
     ("flat", "貧乳 お姉さん"),
     ("flat", "微乳 お姉さん"),
+    ("flat", "貧乳 全裸 お姉さん"),
 )
 HOT_BUCKETS = ("curvy", "average", "slim", "petite", "flat")
 THIN_BUCKETS = ("slim", "petite", "flat")
@@ -202,18 +208,81 @@ def is_rough_work(tags: list[str], title: str = "") -> bool:
     return False
 
 
+# Comics, multi-panel pages, and tagged clutter. A partner in one frame is not this.
+BUSY_SCENE_MARKERS = (
+    "漫画",
+    "4コマ",
+    "四コマ",
+    "コマ割り",
+    "漫画風",
+    "複数コマ",
+    "講座",
+    "メイキング",
+    "チュートリアル",
+    "集合絵",
+    "ごちゃごちゃ",
+    "背景重視",
+)
+# Exact tags, or a tag that contains one of the longer phrases. Bare 裸 is exact
+# so 裸足 does not count. Used as a rank tie-break, not a requirement.
+SIMPLE_SILHOUETTE_EXACT = {
+    "全裸",
+    "ヌード",
+    "セミヌード",
+    "ほぼ全裸",
+    "半裸",
+    "裸",
+    "白背景",
+    "背景なし",
+    "無背景",
+    "シンプル背景",
+    "単色背景",
+}
+_SIMPLE_SILHOUETTE_PARTS = ("全裸", "ヌード", "白背景", "背景なし", "無背景")
+
+
+def _text_blobs(tags: list[str] | str, title: str = "") -> list[str]:
+    blobs = [str(title or "")]
+    if isinstance(tags, str):
+        blobs.extend(part.strip() for part in tags.replace("|", ",").split(",") if part.strip())
+    else:
+        blobs.extend(str(tag or "") for tag in tags)
+    return [blob.strip() for blob in blobs if blob and blob.strip()]
+
+
+def is_busy_scene(tags: list[str] | str, title: str = "") -> bool:
+    """Drop tagged comics, multi-panel pages, and cluttered backgrounds."""
+    for blob in _text_blobs(tags, title):
+        if any(marker in blob for marker in BUSY_SCENE_MARKERS):
+            return True
+    return False
+
+
+def prefers_simple_silhouette(tags: list[str] | str, title: str = "") -> bool:
+    """True when tags say nude/near-nude or a plain background. Popularity still ranks first."""
+    for blob in _text_blobs(tags, title):
+        if blob in SIMPLE_SILHOUETTE_EXACT:
+            return True
+        if any(part in blob for part in _SIMPLE_SILHOUETTE_PARTS):
+            return True
+    return False
+
+
 def hot_search_url(
     word: str,
     page: int,
     *,
-    start_date: str,
-    end_date: str,
+    start_date: str = "",
+    end_date: str = "",
     order: str = "popular",
     min_bookmarks: int = 0,
 ) -> str:
     from fetch_pixiv import search_url
 
-    req_start, req_end = request_bounds(start_date, end_date)
+    req_start = ""
+    req_end = ""
+    if start_date or end_date:
+        req_start, req_end = request_bounds(start_date, end_date)
     return search_url(
         word,
         page,
@@ -495,27 +564,32 @@ def iter_hot_r18_search(
     fetch_json: FetchJson,
     *,
     pages: int,
-    start_date: str,
-    end_date: str,
+    start_date: str = "",
+    end_date: str = "",
     order: str = "popular",
     min_bookmarks: int = 1000,
     queries: tuple[tuple[str, str], ...] | None = None,
 ) -> tuple[dict[str, list[dict]], dict]:
-    """Popularity-sorted R-18 stubs inside the keep window, grouped by body bucket.
+    """Popularity-sorted R-18 stubs, grouped by body bucket.
 
-    The request uses order=popular_d. scd/ecd are padded by one day because
-    Pixiv treats them as after/before. Rows outside the inclusive keep window
-    are dropped here when the stub has a create date. Slim, petite, and flat
-    stubs also need an adult-setting tag.
+    The request uses order=popular_d. A date window is optional. When dates
+    are set, scd/ecd are padded by one day because Pixiv treats them as
+    after/before, and rows outside the inclusive keep window are dropped when
+    the stub has a create date. Slim, petite, and flat stubs also need an
+    adult-setting tag. Tagged comics and cluttered scenes are dropped.
     """
     chosen = queries if queries is not None else HOT_BODY_QUERIES
     validate_queries([word for _bucket, word in chosen])
-    require_day(start_date)
-    require_day(end_date)
+    dated = bool((start_date or "").strip() or (end_date or "").strip())
+    if dated:
+        require_day(start_date)
+        require_day(end_date)
+        req_start, req_end = request_bounds(start_date, end_date)
+    else:
+        req_start, req_end = "", ""
     sent_order = canonical_order(order)
     groups: dict[str, list[dict]] = {bucket: [] for bucket in HOT_BUCKETS}
     seen: set[str] = set()
-    req_start, req_end = request_bounds(start_date, end_date)
     notes: dict = {
         "order_arg": order,
         "order_sent": sent_order,
@@ -564,7 +638,7 @@ def iter_hot_r18_search(
                         tag_list.append(str(tag))
                 tag_list = [tag for tag in tag_list if tag]
                 title = str(item.get("title") or "")
-                if is_rough_work(tag_list, title):
+                if is_rough_work(tag_list, title) or is_busy_scene(tag_list, title):
                     continue
                 ok, _why = screen(" ".join([title, *tag_list]), tag_list)
                 if not ok:
@@ -572,7 +646,7 @@ def iter_hot_r18_search(
                 if not thin_bucket_allowed(bucket, tag_list, title):
                     continue
                 day = create_day(str(item.get("createDate") or ""))
-                if day and not in_date_window(day, start_date, end_date):
+                if dated and day and not in_date_window(day, start_date, end_date):
                     continue
                 counted = bookmark_count(item)
                 if counted is not None:
@@ -648,8 +722,13 @@ def select_hot_rows(
         if bucket not in by_bucket:
             continue
         by_bucket[bucket].append(row)
+    def sort_key(row: dict) -> tuple[int, int]:
+        bookmarks = int(row.get("bookmark_count") or 0)
+        simple = 1 if prefers_simple_silhouette(row.get("tags") or [], str(row.get("title") or "")) else 0
+        return bookmarks, simple
+
     for bucket in by_bucket:
-        by_bucket[bucket].sort(key=lambda row: int(row.get("bookmark_count") or 0), reverse=True)
+        by_bucket[bucket].sort(key=sort_key, reverse=True)
     picked: list[dict] = []
     seen: set[str] = set()
     authors: Counter = Counter()
@@ -680,7 +759,7 @@ def select_hot_rows(
                 progressed = True
         if not progressed:
             break
-    leftovers = sorted(rows, key=lambda row: int(row.get("bookmark_count") or 0), reverse=True)
+    leftovers = sorted(rows, key=sort_key, reverse=True)
     for row in leftovers:
         if len(picked) >= limit:
             break

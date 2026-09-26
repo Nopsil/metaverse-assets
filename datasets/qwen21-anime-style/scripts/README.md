@@ -29,16 +29,16 @@ The run also writes `catalog/civitai_adult_pending.csv` for adult rows that are 
 
 ## Pixiv on your Windows PC
 
-`collect_pixiv_windows.py` and `download_pixiv_originals.py` use a dedicated Playwright profile and `--proxy`. Never the system Chrome profile. `--login` is once. The collector writes page URLs. `--mode hot` with `--date-windows 7,30,90,180,365` is the popularity-rank pass (`order=popular_d`). The downloader saves `img-original` files under gitignored `catalog/_originals_hot/`, skips ugoira, and keeps the first 3 stills of a multi-page work. The previous candidate snapshot is train-unready under `catalog/quarantine/poor-aesthetic-20260927/`. The run order is `collect_pixiv_windows.md`.
+`collect_pixiv_windows.py` and `download_pixiv_originals.py` use a dedicated Playwright profile and `--proxy`. Never the system Chrome profile. `--login` is once. The collector writes page URLs. `--mode hot` is the popularity-rank pass (`order=popular_d`). A date window is optional. The downloader saves `img-original` files under gitignored `catalog/_originals_hot/`, skips ugoira, and keeps the first 3 stills of a multi-page work. The previous candidate snapshot is train-unready under `catalog/quarantine/poor-aesthetic-20260927/`. Ids that failed a full-size look are `catalog/quarantine/failed-review/`. The run order is `collect_pixiv_windows.md`.
 
 ```bat
 py -3 collect_pixiv_windows.py --login --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
-py -3 collect_pixiv_windows.py --mode hot --limit 40 --order popular --start-date 2026-04-01 --end-date 2026-10-31 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
+py -3 collect_pixiv_windows.py --mode hot --limit 40 --order popular --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
 py -3 download_pixiv_originals.py --catalog ../catalog/style_candidates.jsonl --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
 
-`--mode hot` is the popularity pass: R-18, `order=popular_d`, posting dates 2026-04-01 through 2026-10-31, bookmark floor 1000, body buckets curvy / average / slim / petite / flat. Child-coded characters still drop. `--quarantine-pixiv-below` on `merge_exports.py` marks older low-bookmark Pixiv rows `visual_review=quarantine`.
+`--mode hot` is the popularity pass: R-18, `order=popular_d`, no posting window unless you pass one, bookmark floor 1000, body buckets curvy / average / slim / petite / flat. Prefer a simple adult nude or near-nude. Busy multi-panel tags drop. Child-coded characters still drop. `--quarantine-pixiv-below` on `merge_exports.py` marks older low-bookmark Pixiv rows `visual_review=quarantine`. Failed-review ids are not merged back.
 
 `--self-check` only validates the adult search words. On Linux or macOS both scripts exit without opening a browser.
 

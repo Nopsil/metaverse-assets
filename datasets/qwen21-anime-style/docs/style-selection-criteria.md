@@ -9,11 +9,13 @@ The catalog is a candidate pool for later training on **official Qwen Image 2.1*
 - 2D anime or illustration rendering: cel paint, thick digital paint, clean lineart, flat or limited color.
 - A clearly adult character, or an all-ages illustration whose character reads as an adult.
 - Long edge at least 1024 and short edge at least 768.
-- Mix of framing (portrait, half-body, full-body) and costume (fantasy, wafuku, military, casual, witch, knight).
+- The training target is a readable body silhouette plus anime style: one adult figure, nude or near-nude, simple background, few props.
+- Mix of framing (portrait, half-body, full-body). Costume is fine when it does not hide the silhouette.
 - Original characters preferred. Named adults are allowed when the design is unmistakably adult and the row is not a dump of one face.
 - Adult body diversity. Keep petite, slim, and flat-chested characters when the setting is adult. Do not fill the pool with only tall, mature, or voluptuous figures. A petite adult is not a minor.
 - The previous `style_candidates` snapshot and its `_originals` files are train-unready. The table is `catalog/quarantine/poor-aesthetic-20260927/` with `status=deprecated`. Leftover originals are `catalog/quarantine/pre-hot-rerank/`. `stage_dataset.py` refuses both. They are not merged back into the active list.
-- New Pixiv picks use membership popularity order (`order=popular_d`) and a high bookmark floor. April–October 2026 was only an example span. The collector widens through 7, 30, 90, 180, and 365 days until each adult body bucket has a deep pool. Slim, petite, and flat rows also need an adult-setting tag. Child-coded popular pages are not used to fill a thin bucket.
+- New Pixiv picks use membership popularity order (`order=popular_d`) and a high bookmark floor. A posting-date window is optional, not required. `--date-windows` is only for when you want a shorter span. Slim, petite, and flat rows also need an adult-setting tag. Child-coded popular pages are not used to fill a thin bucket.
+- Prefer a clean adult nude or near-nude with a simple composition. When bookmark counts tie, a plain silhouette ranks ahead of a busier frame. Tags do not replace the full-size look.
 - Pixiv: human or unlabeled illustrations. AI-labeled Pixiv works (`aiType == 2`) are skipped so the style target is not only model output. Civitai showcases are AI generations and are marked `ai_generated=yes`.
 
 ## What to drop
@@ -27,7 +29,8 @@ Hard drop, even if the picture is otherwise pretty:
 - Photoreal, DSLR, “ultra realistic,” furry, and My Little Pony / Pony Diffusion.
 - 3D character renders (`3d style`, `3d render`, `3dcg`). They pull the style off 2D anime.
 - Gore.
-- Comics and tutorials (multi-panel pages, 講座).
+- Comics, tutorials, and other busy frames (multi-panel pages, 講座, 集合絵, cluttered backgrounds, extra props). A noisy scene teaches the LoRA the clutter instead of the body silhouette.
+- `142269340` failed full-size review. It is not a candidate. The note is `catalog/quarantine/failed-review/`. Do not merge it back.
 - Civitai `minor` or `poi` flags. Pixiv `lo` flag.
 - Empty prompts on Civitai (no tags to screen).
 
@@ -62,7 +65,7 @@ Home-exported Pixiv URLs are merged with `scripts/merge_exports.py`. The same ar
 
 1. Metadata screen (`scripts/safety.py`): series, character, school, stated age.
 2. Thumbnail pass on the committed cloud snapshot (`visual_review=thumbnail_pass`). That pass saw thumbs only, not `img-original`.
-3. On Windows, download originals with `scripts/download_pixiv_originals.py`, then review those files. Delete the row if the series, character, or setting is child-coded. Do not delete a clearly adult character for cute proportions.
+3. On Windows, download originals with `scripts/download_pixiv_originals.py`, then review those files. Delete the row if the series, character, or setting is child-coded, or if the frame is a busy multi-panel or cluttered scene. Keep a clean adult nude or near-nude whose silhouette is the subject. Do not delete a clearly adult character for cute proportions.
 
 ## Not this catalog
 

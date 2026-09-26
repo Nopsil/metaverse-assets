@@ -47,13 +47,13 @@ From `datasets/qwen21-anime-style/scripts`. Profile and proxy are the ones alrea
 
 ```bat
 py -3 collect_pixiv_windows.py --login --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
-py -3 collect_pixiv_windows.py --mode hot --limit 48 --order popular --date-windows 7,30,90,180,365 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
+py -3 collect_pixiv_windows.py --mode hot --limit 48 --order popular --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
 py -3 download_pixiv_originals.py --catalog ../catalog/_pixiv_hot_export.jsonl --out ../catalog/_originals_hot --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
 
 New Pixiv files land in gitignored `catalog/_originals_hot/`. The previous originals under `catalog/quarantine/poor-aesthetic-20260927/_originals/` and `catalog/_originals/` are train-unready and are not staged. Put Civitai full-size files in gitignored `catalog/_originals_civitai/`. Put anatomy stills in gitignored `catalog/_originals_anatomy/`. Thumbs (`square1200`, `master1200`) are not training files.
 
-Review every file at full size. Delete a file when the series, character, or setting is child-coded. Do not commit images, cookies, or the Chrome profile.
+Review every file at full size. Delete a file when the series, character, or setting is child-coded, or when the frame is a busy multi-panel or cluttered scene. Keep a clean adult nude or near-nude whose silhouette is the subject. Do not commit images, cookies, or the Chrome profile.
 
 ### 2. Stage folders (Windows or Linux)
 

@@ -81,7 +81,7 @@ def pixiv_targets(rows: list[dict]) -> list[dict]:
         artwork_id = str(row.get("id") or (ref.id if ref else ""))
         if not artwork_id.isdigit() or artwork_id in seen:
             continue
-        if str(row.get("visual_review") or "") == "quarantine":
+        if str(row.get("visual_review") or "") in {"quarantine", "rejected"}:
             continue
         if str(row.get("status") or "").lower() == "deprecated":
             continue

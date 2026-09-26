@@ -187,15 +187,40 @@ def is_train_unready(row: dict) -> bool:
     status = str(row.get("status") or "").lower()
     review = str(row.get("visual_review") or "")
     pool = str(row.get("pool") or "")
-    return status == "deprecated" or review == "quarantine" or pool == "quarantine"
+    return status == "deprecated" or review in {"quarantine", "rejected"} or pool == "quarantine"
 
 
-def merge_rows(base: list[dict], incoming: list[dict]) -> tuple[list[dict], Counter]:
+def rejected_review_ids(path: Path | None = None) -> set[str]:
+    """Artwork ids that failed a full-size look. They stay out of the active list."""
+    path = path or (CATALOG / "quarantine" / "failed-review" / "rejected.jsonl")
+    if not path.exists():
+        return set()
+    ids: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        artwork_id = str(row.get("id") or "")
+        if artwork_id.isdigit():
+            ids.add(artwork_id)
+    return ids
+
+
+def merge_rows(
+    base: list[dict],
+    incoming: list[dict],
+    rejected: set[str] | None = None,
+) -> tuple[list[dict], Counter]:
     stats: Counter = Counter()
+    blocked = rejected or set()
     ordered: list[dict] = []
     index: dict[tuple[str, str], int] = {}
     for row in base:
-        if is_train_unready(row):
+        if str(row.get("id") or "") in blocked or is_train_unready(row):
             stats["deprecated_skipped"] += 1
             continue
         key = dedupe_key(row)
@@ -210,7 +235,7 @@ def merge_rows(base: list[dict], incoming: list[dict]) -> tuple[list[dict], Coun
         stats["base"] += 1
 
     for raw in incoming:
-        if is_train_unready(raw):
+        if str(raw.get("id") or "") in blocked or is_train_unready(raw):
             stats["deprecated_skipped"] += 1
             continue
         screened, reason = screen_incoming(raw)
@@ -262,7 +287,7 @@ def main() -> None:
     incoming: list[dict] = []
     for path in args.imports:
         incoming.extend(load_export(path))
-    merged, stats = merge_rows(base, incoming)
+    merged, stats = merge_rows(base, incoming, rejected_review_ids())
     quarantine_stats = {}
     if args.quarantine_pixiv_below:
         quarantine_stats = dict(

@@ -42,23 +42,21 @@ py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Use
 
 `--mode both` reads public bookmarks and an allowlisted R-18 search (お姉さん / 熟女 / 人妻 / 長身 / 巨乳, original illustrations). Safe-mode stand-ins from a masked R-18 search are not saved. Every title, tag, and description goes through `safety.py`. Output is gitignored `catalog/_pixiv_windows_export.jsonl`.
 
-### Popular R-18 in a date window
+### Popular R-18, no date window required
 
 ```bat
-py -3 collect_pixiv_windows.py --mode hot --limit 40 --pages 2 --order popular --start-date 2026-04-01 --end-date 2026-10-31 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
+py -3 collect_pixiv_windows.py --mode hot --limit 40 --pages 2 --order popular --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
 ```
 
-`--mode hot` ranks by `order=popular_d`. The April–October 2026 dates were only an example. Pass `--date-windows 7,30,90,180,365` and the collector keeps widening until each adult body bucket (curvy, average, slim, petite, flat) has a high-bookmark pool, or it reaches one year. Slim, petite, and flat queries also require an adult-setting tag (`お姉さん`, `人妻`, `熟女`, and similar). Child-coded pages are not used to fill those buckets.
+`--mode hot` ranks by `order=popular_d`. Omit `--start-date`, `--end-date`, and `--date-windows` unless you want a posting window. Popularity is the rank. The goal is a clean adult nude or near-nude: one figure, simple background, few props. Nude queries sit next to the body queries. Slim, petite, and flat queries also require an adult-setting tag (`お姉さん`, `人妻`, `熟女`, and similar). Child-coded pages are not used to fill those buckets.
 
-Prefer a flexible window. The collector tries the shortest span that still fills `--limit`:
+A date window is optional. `--date-windows 7,30,90,180,365` widens until each adult body bucket has a high-bookmark pool, or it reaches one year. A fixed span such as `2026-04-01` through `2026-10-31` is `--start-date` and `--end-date` with `--date-windows` omitted.
 
 ```bat
 py -3 collect_pixiv_windows.py --mode hot --limit 48 --pages 2 --order popular --date-windows 7,30,90,180,365 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --exclude ..\catalog\quarantine\poor-aesthetic-20260927\style_candidates.jsonl --out ..\catalog\_pixiv_hot_export.jsonl
 ```
 
-`--date-windows` overrides `--start-date` / `--end-date`. The fixed window `2026-04-01` through `2026-10-31` remains available when you pass those dates and omit `--date-windows`.
-
-Queries stay on adult fictional looks and are balanced across curvy, average, slim, petite, and flat. Child-coded, school, and under-21 text still drop. Sketches (`ラフ`, `落書き`, `下描き`) and `作画崩壊` drop before the detail fetch. A kept row is `pool=hot` and still needs a full-size look.
+Queries stay on adult fictional looks and are balanced across curvy, average, slim, petite, and flat. Child-coded, school, and under-21 text still drop. Sketches (`ラフ`, `落書き`, `下描き`), `作画崩壊`, and busy scenes (`漫画`, `4コマ`, `集合絵`, clutter tags) drop before the detail fetch. Equal bookmark counts prefer a simple nude or plain background. A kept row is `pool=hot` and still needs a full-size look. Ids in `catalog/quarantine/failed-review/rejected.jsonl` are skipped. `142269340` is on that list.
 
 The previous candidate table is `status=deprecated` under `catalog/quarantine/poor-aesthetic-20260927/`. Its originals and later rejected downloads are under `catalog/quarantine/pre-hot-rerank/`. Do not merge that table back in. Publish the hot export as the active list, then download into `catalog/_originals_hot/` (gitignored). `stage_dataset.py` refuses the quarantine folders and `catalog/_originals`.
 
@@ -66,7 +64,7 @@ The previous candidate table is `status=deprecated` under `catalog/quarantine/po
 py -3 download_pixiv_originals.py --catalog ..\catalog\_pixiv_hot_export.jsonl --out ..\catalog\_originals_hot --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
 
-The downloader skips `visual_review=quarantine`, `status=deprecated`, and `pool=quarantine`. It still saves `img-original` only.
+The downloader skips `visual_review=quarantine`, `visual_review=rejected`, `status=deprecated`, and `pool=quarantine`. It still saves `img-original` only.
 
 Both scripts pause at random before every search page, artwork page, and detail request (about 3.5–14 seconds, sometimes up to half a minute) and before every full-size file (about 2–8 seconds). A retry uses that same page gap. They do not burst requests. Use only the dedicated profile and the local proxy.
 
@@ -78,9 +76,9 @@ Both scripts pause at random before every search page, artwork page, and detail 
 | `--user-id 123456` | Numeric id from `https://www.pixiv.net/users/123456`, if the page does not show one. |
 | `--mode bookmarks` | Public bookmarks only. |
 | `--mode r18` | Allowlisted R-18 searches only. |
-| `--mode hot` | Popular R-18 search. Sends `order=popular_d` (`--order popular`). |
-| `--date-windows` | Shortest-first day spans, such as `7,30,90,180,365`. Stops at the first span that fills `--limit`. |
-| `--start-date` / `--end-date` | Inclusive posting window when `--date-windows` is omitted. Default `2026-04-01` `2026-10-31`. The request pads one day because Pixiv's `scd` / `ecd` are after / before. |
+| `--mode hot` | Popular R-18 search. Sends `order=popular_d` (`--order popular`). No date window unless you pass one. |
+| `--date-windows` | Optional shortest-first day spans, such as `7,30,90,180,365`. Stops at the first span that fills `--limit`. |
+| `--start-date` / `--end-date` | Optional inclusive posting window. Omit both for popularity rank with no `scd` / `ecd`. When set, the request pads one day because Pixiv's bounds are after / before. |
 | `--exclude` | JSONL whose artwork ids are skipped. Use the quarantined candidate file. |
 | `--min-bookmarks` | Hot-mode floor, default 1000, sent as `blt` when the membership allows it. |
 | `--include-private` | Also read private bookmarks. They stay in the gitignored export unless you merge them. |

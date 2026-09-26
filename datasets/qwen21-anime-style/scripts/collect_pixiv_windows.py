@@ -40,7 +40,9 @@ from pixiv_home import (
     iter_bookmark_works,
     iter_hot_r18_search,
     iter_r18_search,
+    is_busy_scene,
     parse_date_windows,
+    prefers_simple_silhouette,
     pixiv_block_reason,
     queries_for_body,
     queries_for_buckets,
@@ -151,8 +153,15 @@ def scrape(page, args) -> tuple[list[dict], dict]:
         notes["r18_masked_queries"] = masked
         stubs.extend(found)
     if args.mode == "hot":
+        if bool(args.start_date) != bool(args.end_date):
+            raise RuntimeError("Pass both --start-date and --end-date, or omit both for popularity rank with no date window.")
         if getattr(args, "date_windows", ""):
             return _scrape_flexible_hot(fetch_json, args, dropped, notes)
+        notes["strategy"] = (
+            "popular_d membership rank"
+            if not args.start_date
+            else f"popular_d inside {args.start_date}..{args.end_date}"
+        )
         groups, search_notes = iter_hot_r18_search(
             fetch_json,
             pages=args.pages,
@@ -173,6 +182,12 @@ def scrape(page, args) -> tuple[list[dict], dict]:
     )
     if args.mode == "hot":
         rows = _finish_hot_rows(rows, stubs, args, dropped, notes)
+        rows = _drop_skipped(rows, _skip_ids(getattr(args, "exclude", None)), dropped)
+        if not args.start_date:
+            notes["bookmark_strategy"] = (
+                f"order=popular_d with bookmark floor {args.min_bookmarks}; "
+                "not the user bookmark list; no date window"
+            )
     notes["dropped"] = dict(dropped)
     notes["rows"] = len(rows)
     if notes.get("r18_masked_queries") and not notes.get("r18_stubs"):
@@ -203,7 +218,6 @@ def _scrape_flexible_hot(fetch_json, args, dropped: Counter, notes: dict) -> tup
     )
     notes["window_attempts"] = []
     notes["per_bucket_target"] = per_bucket
-    excluded = _excluded_ids(getattr(args, "exclude", None))
     chosen: list[dict] = []
     for days, start, end in windows:
         groups, search_notes = iter_hot_r18_search(
@@ -242,10 +256,7 @@ def _scrape_flexible_hot(fetch_json, args, dropped: Counter, notes: dict) -> tup
             delay_s=0,
         )
         rows = _finish_hot_rows(rows, stubs, args, dropped, notes)
-        if excluded:
-            before = len(rows)
-            rows = [row for row in rows if str(row.get("id") or "") not in excluded]
-            dropped["excluded_previous"] += before - len(rows)
+        rows = _drop_skipped(rows, _skip_ids(getattr(args, "exclude", None)), dropped)
         chosen = rows
         notes["date_window_days"] = days
         notes["date_start"] = start
@@ -260,6 +271,27 @@ def _scrape_flexible_hot(fetch_json, args, dropped: Counter, notes: dict) -> tup
         f"({notes.get('date_start')}..{notes.get('date_end')})"
     )
     return chosen, notes
+
+
+def _rejected_catalog() -> Path:
+    return HERE.parent / "catalog" / "quarantine" / "failed-review" / "rejected.jsonl"
+
+
+def _skip_ids(extra: Path | None) -> set[str]:
+    """Caller excludes plus artwork ids that already failed full-size review."""
+    return _excluded_ids(extra) | _excluded_ids(_rejected_catalog())
+
+
+def _drop_skipped(rows: list[dict], skip: set[str], dropped: Counter) -> list[dict]:
+    if not skip:
+        return rows
+    kept = []
+    for row in rows:
+        if str(row.get("id") or "") in skip:
+            dropped["excluded_previous"] += 1
+            continue
+        kept.append(row)
+    return kept
 
 
 def _excluded_ids(path: Path | None) -> set[str]:
@@ -315,7 +347,8 @@ def _finish_hot_rows(rows, stubs, args, dropped: Counter, notes: dict) -> list[d
         stub = meta.get(str(row.get("id") or ""), {})
         row["body_bucket"] = str(stub.get("_body_bucket") or "")
         row["pool"] = "hot"
-        row["collected_via"] = "pixiv_popular_date_window"
+        dated = bool(str(args.start_date or "").strip() and str(args.end_date or "").strip())
+        row["collected_via"] = "pixiv_popular_date_window" if dated else "pixiv_popular"
         if not row.get("create_date"):
             row["create_date"] = create_day(str(stub.get("createDate") or ""))
         counted = int(row.get("bookmark_count") or 0)
@@ -323,10 +356,14 @@ def _finish_hot_rows(rows, stubs, args, dropped: Counter, notes: dict) -> list[d
         if stub_count > counted:
             row["bookmark_count"] = stub_count
             row["quality"] = stub_count
+        window = f"{args.start_date}..{args.end_date}" if dated else "no date window"
+        simple = prefers_simple_silhouette(row.get("tags") or [], str(row.get("title") or ""))
+        silhouette = " Tags suggest a simple nude or near-nude figure." if simple else ""
         row["keep_reason"] = (
-            f"Popular R-18 search {args.start_date}..{args.end_date} "
+            f"Popular R-18 search {window} "
             f"({row.get('body_bucket')}, {row.get('bookmark_count')} bookmarks). "
-            "Metadata screen passed. Full-size review is still required before training."
+            "Metadata screen passed."
+            f"{silhouette} Full-size review is still required before training."
         )
     notes["detail_bookmark_summary"] = bookmark_summary(
         [int(row.get("bookmark_count") or 0) for row in rows]
@@ -334,8 +371,12 @@ def _finish_hot_rows(rows, stubs, args, dropped: Counter, notes: dict) -> list[d
     filtered = []
     for row in rows:
         day = str(row.get("create_date") or "")
-        if not in_date_window(day, args.start_date, args.end_date):
+        dated = bool(str(args.start_date or "").strip() and str(args.end_date or "").strip())
+        if dated and not in_date_window(day, args.start_date, args.end_date):
             dropped["outside_date"] += 1
+            continue
+        if is_busy_scene(row.get("tags") or [], str(row.get("title") or "")):
+            dropped["busy_scene"] += 1
             continue
         if row.get("rating") != "adult":
             dropped["not_adult"] += 1
@@ -422,12 +463,20 @@ def main() -> None:
         default="popular",
         help="Hot mode sort. popular and 人気 are sent as Pixiv order=popular_d.",
     )
-    parser.add_argument("--start-date", default=HOT_KEEP_START, help="Inclusive keep-window start, YYYY-MM-DD.")
-    parser.add_argument("--end-date", default=HOT_KEEP_END, help="Inclusive keep-window end, YYYY-MM-DD.")
+    parser.add_argument(
+        "--start-date",
+        default="",
+        help="Optional inclusive keep-window start, YYYY-MM-DD. Omit both dates to rank by popularity with no posting window.",
+    )
+    parser.add_argument(
+        "--end-date",
+        default="",
+        help="Optional inclusive keep-window end, YYYY-MM-DD. Pass with --start-date, or omit both.",
+    )
     parser.add_argument(
         "--date-windows",
         default="",
-        help="Hot mode: shortest-first day spans, for example 7,30,90,180,365. Overrides --start-date.",
+        help="Optional hot-mode day spans, shortest first, for example 7,30,90,180,365. Overrides --start-date.",
     )
     parser.add_argument(
         "--exclude",
@@ -467,7 +516,8 @@ def main() -> None:
             "mature_queries": len(ADULT_R18_QUERIES),
             "petite_queries": len(PETITE_ADULT_QUERIES),
             "hot_queries": len(HOT_BODY_QUERIES),
-            "hot_keep": [HOT_KEEP_START, HOT_KEEP_END],
+            "hot_keep_example": [HOT_KEEP_START, HOT_KEEP_END],
+            "hot_date_window": "optional",
             "hot_order": "popular_d",
         }))
         return

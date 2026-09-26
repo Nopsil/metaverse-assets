@@ -8,7 +8,7 @@ Nothing here trains a model. Other files in the assets repo are untouched.
 
 Zero minors. Rows must be clearly adult characters, or clean all-ages illustrations of adult-looking characters. School uniforms, child-coded series, stated ages under 21, chibi, and ambiguous age are out. If a picture is unclear, it does not belong in the set.
 
-Metadata filters are not enough. The previous candidate table, including its thumbnail pass, is train-unready under `catalog/quarantine/poor-aesthetic-20260927/` with `status=deprecated`. Its originals stay on disk for audit and are excluded from staging. The active list is the fresh popularity-ranked Pixiv set with `visual_review=pending`. **Every URL still needs a full-size look of the original file before training.**
+Metadata filters are not enough. The previous candidate table, including its thumbnail pass, is train-unready under `catalog/quarantine/poor-aesthetic-20260927/` with `status=deprecated`. Its originals stay on disk for audit and are excluded from staging. The active list is the fresh popularity-ranked Pixiv set with `visual_review=pending`. A date window is optional. Prefer a clean adult nude or near-nude with a simple, character-focused composition; busy multi-panel scenes stay out. **Every URL still needs a full-size look of the original file before training.**
 
 ## Layout
 
@@ -16,6 +16,7 @@ Metadata filters are not enough. The previous candidate table, including its thu
 | --- | --- |
 | `catalog/quarantine/poor-aesthetic-20260927/` | Previous candidate table. `status=deprecated`. Train-unready. Kept for audit. |
 | `catalog/quarantine/pre-hot-rerank/` | Originals from that batch and from rejected downloads. Not a train path. |
+| `catalog/quarantine/failed-review/` | Artwork ids that failed a full-size look. Not a train path. |
 | `catalog/style_candidates.csv` | Active style candidates: popularity-ranked Pixiv rows, `visual_review=pending`. |
 | `catalog/style_candidates.jsonl` | Same rows, plus fields used by the scripts. |
 | `catalog/nsfw_anatomy_scaffold.csv` | Header only. Anatomy set is not populated. |

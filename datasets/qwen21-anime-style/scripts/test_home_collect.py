@@ -364,6 +364,25 @@ class HotSearchTest(unittest.TestCase):
         self.assertTrue(in_date_window("2026-10-31", "2026-04-01", "2026-10-31"))
         self.assertFalse(in_date_window("2026-03-31", "2026-04-01", "2026-10-31"))
         self.assertFalse(in_date_window("2026-11-01", "2026-04-01", "2026-10-31"))
+        open_url = hot_search_url("お姉さん オリジナル", 1, order="popular", min_bookmarks=1000)
+        self.assertIn("order=popular_d", open_url)
+        self.assertNotIn("scd=", open_url)
+        self.assertNotIn("ecd=", open_url)
+
+    def test_busy_scenes_drop_and_simple_nudes_rank_first_on_a_tie(self):
+        from pixiv_home import is_busy_scene, prefers_simple_silhouette, select_hot_rows
+
+        self.assertTrue(is_busy_scene(["お姉さん", "4コマ"], "漫画"))
+        self.assertTrue(is_busy_scene(["集合絵"], ""))
+        self.assertFalse(is_busy_scene(["全裸", "お姉さん", "白背景"], "夜"))
+        self.assertTrue(prefers_simple_silhouette(["全裸", "白背景"], ""))
+        self.assertFalse(prefers_simple_silhouette(["裸足", "お姉さん"], ""))
+        rows = [
+            {"id": "1", "body_bucket": "average", "bookmark_count": 1000, "user_id": "a", "tags": ["お姉さん"]},
+            {"id": "2", "body_bucket": "average", "bookmark_count": 1000, "user_id": "b", "tags": ["全裸", "白背景"]},
+        ]
+        chosen = select_hot_rows(rows, limit=1, per_bucket=1)
+        self.assertEqual(chosen[0]["id"], "2")
 
     def test_hot_search_keeps_diverse_adults_inside_the_window(self):
         from pixiv_home import hot_query_texts, iter_hot_r18_search, select_hot_rows, validate_queries
@@ -479,6 +498,7 @@ class HotSearchTest(unittest.TestCase):
             {"source": "pixiv", "id": "10", "url": "https://www.pixiv.net/artworks/10", "visual_review": "quarantine"},
             {"source": "pixiv", "id": "12", "url": "https://www.pixiv.net/artworks/12", "status": "deprecated", "visual_review": "thumbnail_pass"},
             {"source": "pixiv", "id": "11", "url": "https://www.pixiv.net/artworks/11", "visual_review": "pending"},
+            {"source": "pixiv", "id": "13", "url": "https://www.pixiv.net/artworks/13", "visual_review": "rejected"},
         ])
         self.assertEqual([item["id"] for item in targets], ["11"])
 
@@ -490,6 +510,13 @@ class HotSearchTest(unittest.TestCase):
         merged, stats = merge_rows(base, incoming)
         self.assertEqual(merged, [])
         self.assertEqual(stats["deprecated_skipped"], 2)
+        again, again_stats = merge_rows(
+            [{"source": "pixiv", "id": "142269340", "title": "back", "tags": ["お姉さん"], "url": "https://www.pixiv.net/artworks/142269340"}],
+            [{"source": "pixiv", "id": "3", "title": "new", "tags": ["お姉さん"], "url": "https://www.pixiv.net/artworks/3"}],
+            {"142269340"},
+        )
+        self.assertEqual([row["id"] for row in again], ["3"])
+        self.assertEqual(again_stats["deprecated_skipped"], 1)
 
 
 class CliTest(unittest.TestCase):
