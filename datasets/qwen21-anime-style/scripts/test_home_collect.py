@@ -314,6 +314,17 @@ class FlexibleWindowTest(unittest.TestCase):
         self.assertEqual(choose_window_days({7: 4, 30: 48, 90: 80}, 40, spans), 30)
         self.assertEqual(choose_window_days({7: 1, 30: 2, 365: 10}, 40, spans), 365)
 
+    def test_thin_buckets_need_an_adult_setting(self):
+        from pixiv_home import queries_for_buckets, thin_bucket_allowed, validate_queries
+
+        slim = queries_for_buckets(["slim"])
+        self.assertTrue(slim)
+        self.assertTrue(all(bucket == "slim" for bucket, _word in slim))
+        validate_queries([word for _bucket, word in slim])
+        self.assertFalse(thin_bucket_allowed("slim", ["スレンダー", "オリジナル"], "夜"))
+        self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "お姉さん"], "夜"))
+        self.assertTrue(thin_bucket_allowed("curvy", ["巨乳", "オリジナル"], "夜"))
+
 
 class HotSearchTest(unittest.TestCase):
     def test_popular_url_uses_padded_dates_and_bookmark_floor(self):

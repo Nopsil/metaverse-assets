@@ -25,6 +25,7 @@ from pixiv_browser import open_pixiv, require_windows
 from pixiv_home import (
     ADULT_R18_QUERIES,
     HOT_BODY_QUERIES,
+    HOT_BUCKETS,
     HOT_KEEP_END,
     HOT_KEEP_START,
     PETITE_ADULT_QUERIES,
@@ -41,6 +42,7 @@ from pixiv_home import (
     parse_date_windows,
     pixiv_block_reason,
     queries_for_body,
+    queries_for_buckets,
     select_hot_rows,
     validate_queries,
 )
@@ -187,9 +189,17 @@ def _scrape_flexible_hot(fetch_json, args, dropped: Counter, notes: dict) -> tup
     """
     spans = parse_date_windows(args.date_windows)
     windows = flexible_keep_windows(date.today(), spans)
+    bucket_names = [part.strip() for part in str(getattr(args, "buckets", "") or "").split(",") if part.strip()]
+    queries = queries_for_buckets(bucket_names or None)
+    wanted = bucket_names or list(HOT_BUCKETS)
+    per_bucket = max(4, args.limit // max(len(wanted), 1))
     notes["order"] = "popular_d"
-    notes["strategy"] = "popular_d membership rank; shortest date window that fills the list"
+    notes["strategy"] = (
+        "popular_d membership rank; widen 7/30/90/180/365 days until each "
+        "adult body bucket has a high-bookmark pool"
+    )
     notes["window_attempts"] = []
+    notes["per_bucket_target"] = per_bucket
     excluded = _excluded_ids(getattr(args, "exclude", None))
     chosen: list[dict] = []
     for days, start, end in windows:
@@ -200,6 +210,7 @@ def _scrape_flexible_hot(fetch_json, args, dropped: Counter, notes: dict) -> tup
             end_date=end,
             order=args.order,
             min_bookmarks=args.min_bookmarks,
+            queries=queries,
         )
         stub_count = sum(len(items) for items in groups.values())
         attempt = {
@@ -207,11 +218,13 @@ def _scrape_flexible_hot(fetch_json, args, dropped: Counter, notes: dict) -> tup
             "start": start,
             "end": end,
             "stubs": stub_count,
+            "stub_counts": search_notes.get("stub_counts"),
             "bookmark_floor": args.min_bookmarks,
             "order_sent": search_notes.get("order_sent"),
         }
         notes["window_attempts"].append(attempt)
-        if stub_count < args.limit and days != spans[-1]:
+        ready = all(len(groups.get(bucket) or []) >= per_bucket for bucket in wanted)
+        if not ready and days != spans[-1]:
             continue
         args.start_date = start
         args.end_date = end
@@ -424,6 +437,11 @@ def main() -> None:
         type=int,
         default=1000,
         help="Hot mode bookmark floor. Sent as blt when Pixiv accepts it.",
+    )
+    parser.add_argument(
+        "--buckets",
+        default="",
+        help="Hot body buckets to search, comma-separated: curvy,average,slim,petite,flat. Empty means all.",
     )
     parser.add_argument("--limit", type=int, default=60)
     parser.add_argument("--pages", type=int, default=2, help="R-18 search pages per query.")

@@ -13,7 +13,7 @@ The catalog is a candidate pool for later training on **official Qwen Image 2.1*
 - Original characters preferred. Named adults are allowed when the design is unmistakably adult and the row is not a dump of one face.
 - Adult body diversity. Keep petite, slim, and flat-chested characters when the setting is adult. Do not fill the pool with only tall, mature, or voluptuous figures. A petite adult is not a minor.
 - The previous `style_candidates` snapshot and its `_originals` files are train-unready (poor aesthetic). They stay under `catalog/quarantine/poor-aesthetic-20260927/` for audit. `stage_dataset.py` refuses that folder and `catalog/_originals`.
-- New Pixiv picks use membership popularity order (`order=popular_d`). The date window starts at 7 days and widens through 30, 90, 180, and 365 days until the screened list fills. An explicit `--start-date` / `--end-date` still works.
+- New Pixiv picks use membership popularity order (`order=popular_d`) and a high bookmark floor. April–October 2026 was only an example span. The collector widens through 7, 30, 90, 180, and 365 days until each adult body bucket has a deep pool. Slim, petite, and flat rows also need an adult-setting tag. Child-coded popular pages are not used to fill a thin bucket.
 - Pixiv: human or unlabeled illustrations. AI-labeled Pixiv works (`aiType == 2`) are skipped so the style target is not only model output. Civitai showcases are AI generations and are marked `ai_generated=yes`.
 
 ## What to drop

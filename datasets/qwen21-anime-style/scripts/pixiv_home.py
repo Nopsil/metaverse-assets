@@ -46,25 +46,55 @@ def queries_for_body(which: str) -> list[str]:
     raise RuntimeError(f"Unknown body set {which!r}")
 
 
-# Popular R-18 originals in a posting window. Each line still has to pass
-# safety.py. Child-coded, school, and under-21 words are not searched.
+# 2026-04-01..2026-10-31 is only an example window. Hot collection widens
+# 7 / 30 / 90 / 180 / 365 days when a shorter span is too thin.
+# Child-coded, school, and under-21 words are not searched.
 HOT_KEEP_START = "2026-04-01"
 HOT_KEEP_END = "2026-10-31"
 HOT_BODY_QUERIES = (
     ("curvy", "巨乳 女性 オリジナル"),
     ("average", "お姉さん オリジナル"),
     ("average", "普通体型 女性 オリジナル"),
-    ("slim", "スレンダー 女性 オリジナル"),
-    ("petite", "細身 女性 オリジナル"),
-    ("petite", "華奢 お姉さん オリジナル"),
-    ("flat", "貧乳 お姉さん オリジナル"),
+    ("slim", "スレンダー お姉さん"),
+    ("slim", "スレンダー 人妻"),
+    ("slim", "スレンダー 熟女"),
+    ("petite", "細身 お姉さん"),
+    ("petite", "華奢 お姉さん"),
+    ("flat", "貧乳 お姉さん"),
+    ("flat", "微乳 お姉さん"),
 )
 HOT_BUCKETS = ("curvy", "average", "slim", "petite", "flat")
+THIN_BUCKETS = ("slim", "petite", "flat")
+ADULT_SETTING_MARKERS = ("お姉さん", "人妻", "熟女", "成人", "女上司", "未亡人")
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def hot_query_texts() -> list[str]:
     return [word for _bucket, word in HOT_BODY_QUERIES]
+
+
+def queries_for_buckets(buckets: list[str] | None) -> tuple[tuple[str, str], ...]:
+    if not buckets:
+        return HOT_BODY_QUERIES
+    wanted = set(buckets)
+    unknown = wanted.difference(HOT_BUCKETS)
+    if unknown:
+        raise RuntimeError(f"Unknown body bucket {sorted(unknown)}")
+    return tuple(item for item in HOT_BODY_QUERIES if item[0] in wanted)
+
+
+def has_adult_setting(tags: list[str], title: str = "") -> bool:
+    """Adult-setting words. Used so a slim or flat popular page cannot keep child-coded hits."""
+    blob = " ".join([title, *tags])
+    if any(marker in blob for marker in ADULT_SETTING_MARKERS):
+        return True
+    return any(str(tag).strip().upper() == "OL" for tag in tags)
+
+
+def thin_bucket_allowed(bucket: str, tags: list[str], title: str = "") -> bool:
+    if bucket not in THIN_BUCKETS:
+        return True
+    return has_adult_setting(tags, title)
 
 
 def canonical_order(order: str) -> str:
@@ -469,14 +499,17 @@ def iter_hot_r18_search(
     end_date: str,
     order: str = "popular",
     min_bookmarks: int = 1000,
+    queries: tuple[tuple[str, str], ...] | None = None,
 ) -> tuple[dict[str, list[dict]], dict]:
     """Popularity-sorted R-18 stubs inside the keep window, grouped by body bucket.
 
     The request uses order=popular_d. scd/ecd are padded by one day because
     Pixiv treats them as after/before. Rows outside the inclusive keep window
-    are dropped here when the stub has a create date.
+    are dropped here when the stub has a create date. Slim, petite, and flat
+    stubs also need an adult-setting tag.
     """
-    validate_queries(hot_query_texts())
+    chosen = queries if queries is not None else HOT_BODY_QUERIES
+    validate_queries([word for _bucket, word in chosen])
     require_day(start_date)
     require_day(end_date)
     sent_order = canonical_order(order)
@@ -490,13 +523,13 @@ def iter_hot_r18_search(
         "keep_end": end_date,
         "request_start": req_start,
         "request_end": req_end,
-        "queries": [word for _bucket, word in HOT_BODY_QUERIES],
+        "queries": [word for _bucket, word in chosen],
         "min_bookmarks": min_bookmarks,
         "search_bookmarks": [],
         "masked_queries": 0,
         "per_query": {},
     }
-    for bucket, word in HOT_BODY_QUERIES:
+    for bucket, word in chosen:
         kept_for_query = 0
         for page in range(1, pages + 1):
             payload = _fetch_hot_page(
@@ -535,6 +568,8 @@ def iter_hot_r18_search(
                     continue
                 ok, _why = screen(" ".join([title, *tag_list]), tag_list)
                 if not ok:
+                    continue
+                if not thin_bucket_allowed(bucket, tag_list, title):
                     continue
                 day = create_day(str(item.get("createDate") or ""))
                 if day and not in_date_window(day, start_date, end_date):

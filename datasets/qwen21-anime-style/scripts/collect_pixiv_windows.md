@@ -48,7 +48,7 @@ py -3 collect_pixiv_windows.py --mode both --limit 60 --dedicated-profile C:\Use
 py -3 collect_pixiv_windows.py --mode hot --limit 40 --pages 2 --order popular --start-date 2026-04-01 --end-date 2026-10-31 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --out ..\catalog\_pixiv_hot_export.jsonl
 ```
 
-`--mode hot` searches logged-in R-18 illustrations with `order=popular_d` (the `popular` / 人気 sort). It does not read the user bookmark list. Pixiv's `scd` and `ecd` are after/before, so each request is padded by one day and rows outside the inclusive window are dropped. `blt` is the bookmark floor when the membership accepts it.
+`--mode hot` ranks by `order=popular_d`. The April–October 2026 dates were only an example. Pass `--date-windows 7,30,90,180,365` and the collector keeps widening until each adult body bucket (curvy, average, slim, petite, flat) has a high-bookmark pool, or it reaches one year. Slim, petite, and flat queries also require an adult-setting tag (`お姉さん`, `人妻`, `熟女`, and similar). Child-coded pages are not used to fill those buckets.
 
 Prefer a flexible window. The collector tries the shortest span that still fills `--limit`:
 
