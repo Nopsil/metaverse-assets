@@ -47,6 +47,7 @@ from pixiv_home import (
     queries_for_body,
     queries_for_buckets,
     select_hot_rows,
+    small_body_ok,
     validate_queries,
 )
 
@@ -162,6 +163,7 @@ def scrape(page, args) -> tuple[list[dict], dict]:
             if not args.start_date
             else f"popular_d inside {args.start_date}..{args.end_date}"
         )
+        bucket_names = [part.strip() for part in str(getattr(args, "buckets", "") or "").split(",") if part.strip()]
         groups, search_notes = iter_hot_r18_search(
             fetch_json,
             pages=args.pages,
@@ -169,6 +171,7 @@ def scrape(page, args) -> tuple[list[dict], dict]:
             end_date=args.end_date,
             order=args.order,
             min_bookmarks=args.min_bookmarks,
+            queries=queries_for_buckets(bucket_names or None),
         )
         notes.update(search_notes)
         stubs = _hot_detail_stubs(groups, detail_limit=max(args.limit * 4, args.limit))
@@ -377,6 +380,9 @@ def _finish_hot_rows(rows, stubs, args, dropped: Counter, notes: dict) -> list[d
             continue
         if is_busy_scene(row.get("tags") or [], str(row.get("title") or "")):
             dropped["busy_scene"] += 1
+            continue
+        if not small_body_ok(str(row.get("body_bucket") or ""), row.get("tags") or [], str(row.get("title") or "")):
+            dropped["body_mismatch"] += 1
             continue
         if row.get("rating") != "adult":
             dropped["not_adult"] += 1

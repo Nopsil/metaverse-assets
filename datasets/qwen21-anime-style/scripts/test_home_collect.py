@@ -339,6 +339,22 @@ class FlexibleWindowTest(unittest.TestCase):
         self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "お姉さん"], "夜"))
         self.assertTrue(thin_bucket_allowed("curvy", ["巨乳", "オリジナル"], "夜"))
 
+    def test_petite_flat_queries_stay_adult_and_reject_large_chests(self):
+        from pixiv_home import queries_for_buckets, small_body_ok, validate_queries
+
+        pairs = queries_for_buckets(["petite", "flat"])
+        words = [word for _bucket, word in pairs]
+        validate_queries(words)
+        self.assertTrue(any("ちっぱい" in word and "お姉さん" in word for word in words))
+        self.assertTrue(any("小柄" in word for word in words))
+        self.assertTrue(any("人妻" in word for word in words))
+        self.assertTrue(small_body_ok("flat", ["貧乳", "お姉さん", "全裸"], "夜"))
+        self.assertFalse(small_body_ok("flat", ["貧乳", "巨乳", "お姉さん"], "夜"))
+        self.assertFalse(small_body_ok("flat", ["お姉さん", "全裸"], "夜"))
+        self.assertFalse(small_body_ok("petite", ["細身", "爆乳", "お姉さん"], "夜"))
+        self.assertTrue(small_body_ok("petite", ["華奢", "お姉さん"], "夜"))
+        self.assertTrue(small_body_ok("curvy", ["巨乳", "オリジナル"], "夜"))
+
 
 class HotSearchTest(unittest.TestCase):
     def test_popular_url_uses_padded_dates_and_bookmark_floor(self):
@@ -360,12 +376,14 @@ class HotSearchTest(unittest.TestCase):
         self.assertIn("scd=2026-03-31", url)
         self.assertIn("ecd=2026-11-01", url)
         self.assertIn("blt=1000", url)
+        self.assertIn("ai_type=1", url)
         self.assertTrue(in_date_window("2026-04-01", "2026-04-01", "2026-10-31"))
         self.assertTrue(in_date_window("2026-10-31", "2026-04-01", "2026-10-31"))
         self.assertFalse(in_date_window("2026-03-31", "2026-04-01", "2026-10-31"))
         self.assertFalse(in_date_window("2026-11-01", "2026-04-01", "2026-10-31"))
         open_url = hot_search_url("お姉さん オリジナル", 1, order="popular", min_bookmarks=1000)
         self.assertIn("order=popular_d", open_url)
+        self.assertIn("ai_type=1", open_url)
         self.assertNotIn("scd=", open_url)
         self.assertNotIn("ecd=", open_url)
 
@@ -414,7 +432,30 @@ class HotSearchTest(unittest.TestCase):
             import urllib.parse
 
             if urllib.parse.quote("貧乳") in url:
-                data = [items[4]]
+                data = [
+                    items[4],
+                    {
+                        "id": "9",
+                        "title": "ai flat",
+                        "xRestrict": 1,
+                        "illustType": 0,
+                        "bookmarkCount": 9000,
+                        "aiType": 2,
+                        "createDate": "2026-08-01T00:00:00+09:00",
+                        "tags": ["貧乳", "お姉さん", "全裸"],
+                        "userId": "9",
+                    },
+                    {
+                        "id": "10",
+                        "title": "busty mismatch",
+                        "xRestrict": 1,
+                        "illustType": 0,
+                        "bookmarkCount": 8000,
+                        "createDate": "2026-08-02T00:00:00+09:00",
+                        "tags": ["貧乳", "巨乳", "お姉さん"],
+                        "userId": "10",
+                    },
+                ]
             elif urllib.parse.quote("巨乳") in url:
                 data = [items[0], items[1], items[2], items[3], items[5], items[6], items[7]]
             else:
@@ -433,6 +474,8 @@ class HotSearchTest(unittest.TestCase):
         self.assertNotIn("6", kept_ids)
         self.assertNotIn("7", kept_ids)
         self.assertNotIn("8", kept_ids)
+        self.assertNotIn("9", kept_ids)
+        self.assertNotIn("10", kept_ids)
         self.assertEqual(notes["order_sent"], "popular_d")
         self.assertGreaterEqual(notes["search_bookmark_summary"]["max"], 5000)
 
