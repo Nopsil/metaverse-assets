@@ -42,6 +42,10 @@ class ScreenTest(unittest.TestCase):
         self.assertTrue(screen("ちっぱい お姉さん オリジナル", tags=["女性"])[0])
         self.assertFalse(screen("ちっぱい ロリ オリジナル")[0])
         self.assertFalse(screen("つるぺた オリジナル 女の子")[0])
+        self.assertFalse(screen("世良真純 名探偵コナン 貧乳")[0])
+        self.assertFalse(screen("からかい上手の高木さん 貧乳 人妻")[0])
+        self.assertFalse(screen("オリジナル 全裸登校 授業参観 人妻")[0])
+        self.assertFalse(screen("人妻 スレンダー 母娘丼")[0])
 
     def test_allows_adult_anime_and_childhood_friend_trope(self):
         ok, reason = screen(

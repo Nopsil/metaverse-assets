@@ -172,6 +172,7 @@ def scrape(page, args) -> tuple[list[dict], dict]:
             order=args.order,
             min_bookmarks=args.min_bookmarks,
             queries=queries_for_buckets(bucket_names or None),
+            skip_ids=_skip_ids(getattr(args, "exclude", None)),
         )
         notes.update(search_notes)
         stubs = _hot_detail_stubs(groups, detail_limit=max(args.limit * 4, args.limit))
@@ -231,6 +232,7 @@ def _scrape_flexible_hot(fetch_json, args, dropped: Counter, notes: dict) -> tup
             order=args.order,
             min_bookmarks=args.min_bookmarks,
             queries=queries,
+            skip_ids=_skip_ids(getattr(args, "exclude", None)),
         )
         stub_count = sum(len(items) for items in groups.values())
         attempt = {

@@ -59,6 +59,7 @@ def search_url(
     artwork_type: str = "illustrations",
     min_bookmarks: int = 0,
     exclude_ai: bool = False,
+    min_width: int = 1024,
 ) -> str:
     """Ajax illustration search. Defaults stay the public safe-mode call.
 
@@ -73,7 +74,7 @@ def search_url(
         "s_mode": "s_tag",
         "type": artwork_type,
         "lang": "en",
-        "wlt": 1024,
+        "wlt": min_width,
     }
     if start_date:
         params["scd"] = start_date
