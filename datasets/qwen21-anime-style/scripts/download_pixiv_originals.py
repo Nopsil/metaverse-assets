@@ -147,7 +147,8 @@ def wait_for_profile(profile: Path, timeout_s: int = 900) -> None:
 def browser_json(page, url: str) -> dict:
     status = 0
     text = ""
-    for attempt in range(4):
+    for _attempt in range(4):
+        pause("page")
         result = page.evaluate(
             """async (url) => {
                 const res = await fetch(url, {
@@ -166,8 +167,7 @@ def browser_json(page, url: str) -> dict:
             _exit("Pixiv refused this network (" + reason + "). Use the home proxy, not a US datacenter IP.")
         if status == 200:
             return json.loads(text)
-        if status in {429, 500, 502, 503} and attempt < 3:
-            time.sleep(3 * (attempt + 1))
+        if status in {429, 500, 502, 503} and _attempt < 3:
             continue
         break
     raise RuntimeError(f"Pixiv HTTP {status}")
@@ -187,6 +187,7 @@ def _fetch_image(page, url: str) -> tuple[int, bytes]:
         return response.status, data
     if response.status == 200 and data[:8] == b"\x89PNG\r\n\x1a\n":
         return response.status, data
+    pause("file")
     result = page.evaluate(
         """async (url) => {
             const res = await fetch(url, {
@@ -271,8 +272,7 @@ def download_one(page, target: dict, out_dir: Path) -> dict:
     saved: list[str] = []
     sizes = plan.get("sizes") or []
     for index, url in enumerate(plan["urls"]):
-        if index:
-            pause("file")
+        pause("file")
         expect_w, expect_h = sizes[index] if index < len(sizes) else (0, 0)
         dest = out_dir / file_name(artwork_id, index, url)
         error = save_original(page, url, dest, expect_w, expect_h)

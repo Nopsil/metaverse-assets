@@ -115,7 +115,7 @@ def make_fetch(page):
                 return json.loads(text)
             if last_status not in {429, 500, 502, 503} or attempt == 4:
                 break
-            time.sleep(2 ** attempt)
+            pause("page")
         raise RuntimeError(f"Pixiv HTTP {last_status}")
 
     return fetch_json
