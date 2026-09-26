@@ -117,25 +117,32 @@ def profile_in_use(profile: Path) -> bool:
 
 
 def browser_json(page, url: str) -> dict:
-    result = page.evaluate(
-        """async (url) => {
-            const res = await fetch(url, {
-                credentials: "include",
-                headers: { "Accept": "application/json" }
-            });
-            const text = await res.text();
-            return { status: res.status, text: text.slice(0, 1500000) };
-        }""",
-        url,
-    )
-    status = int((result or {}).get("status") or 0)
-    text = (result or {}).get("text") or ""
-    reason = pixiv_block_reason(status, text)
-    if reason:
-        _exit("Pixiv refused this network (" + reason + "). Use the home proxy, not a US datacenter IP.")
-    if status != 200:
-        raise RuntimeError(f"Pixiv HTTP {status}")
-    return json.loads(text)
+    status = 0
+    text = ""
+    for attempt in range(4):
+        result = page.evaluate(
+            """async (url) => {
+                const res = await fetch(url, {
+                    credentials: "include",
+                    headers: { "Accept": "application/json" }
+                });
+                const text = await res.text();
+                return { status: res.status, text: text.slice(0, 1500000) };
+            }""",
+            url,
+        )
+        status = int((result or {}).get("status") or 0)
+        text = (result or {}).get("text") or ""
+        reason = pixiv_block_reason(status, text)
+        if reason and reason != "http_429":
+            _exit("Pixiv refused this network (" + reason + "). Use the home proxy, not a US datacenter IP.")
+        if status == 200:
+            return json.loads(text)
+        if status in {429, 500, 502, 503} and attempt < 3:
+            time.sleep(3 * (attempt + 1))
+            continue
+        break
+    raise RuntimeError(f"Pixiv HTTP {status}")
 
 
 def _fetch_image(page, url: str) -> tuple[int, bytes]:
@@ -200,8 +207,21 @@ def save_original(page, url: str, dest: Path, expect_w: int = 0, expect_h: int =
     return None
 
 
+def already_saved(out_dir: Path, artwork_id: str) -> list[str]:
+    names: list[str] = []
+    for path in sorted(out_dir.glob(f"{artwork_id}_p*")):
+        if path.suffix.lower() not in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
+            continue
+        if path.stat().st_size > 0:
+            names.append(path.name)
+    return names
+
+
 def download_one(page, target: dict, out_dir: Path) -> dict:
     artwork_id = target["id"]
+    existing = already_saved(out_dir, artwork_id)
+    if existing:
+        return {"id": artwork_id, "skip": "", "files": existing}
     page.goto(target["url"], wait_until="domcontentloaded", timeout=60000)
     detail = browser_json(page, f"https://www.pixiv.net/ajax/illust/{artwork_id}")
     body = detail.get("body") if isinstance(detail, dict) else None
@@ -271,10 +291,10 @@ def main() -> None:
             try:
                 record = download_one(page, target, args.out)
             except Exception as exc:  # noqa: BLE001 - keep going across artworks
-                record = {"id": target["id"], "skip": "error", "files": [], "error": type(exc).__name__}
+                record = {"id": target["id"], "skip": "error", "files": [], "error": str(exc)[:160]}
             manifest.append(record)
             print(json.dumps(record, ensure_ascii=False), file=sys.stderr)
-            time.sleep(0.45)
+            time.sleep(0.9)
     finally:
         context.close()
         playwright.stop()
