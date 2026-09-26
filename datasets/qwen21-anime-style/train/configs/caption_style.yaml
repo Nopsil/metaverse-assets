@@ -1,0 +1,32 @@
+# AI-Toolkit Qwen3-VL captioner for the style folder.
+# Process uid: Qwen3VLCaptioner (extensions_built_in/captioner).
+# H100: BF16, no quantize. A 12GB home GPU should set quantize: true,
+# qtype: float8, low_vram: true before running this.
+# Does not start a cloud instance. caption_originals.py --launch runs it.
+
+---
+job: extension
+config:
+  name: "qwen21_caption_style"
+  process:
+    - type: "Qwen3VLCaptioner"
+      device: cuda:0
+      caption:
+        model_name_or_path: "Qwen/Qwen3-VL-8B-Instruct"
+        extensions:
+          - jpg
+          - jpeg
+          - png
+          - webp
+        path_to_caption: "__DATASET_DIR__"
+        dtype: bf16
+        device: cuda:0
+        quantize: false
+        low_vram: false
+        caption_extension: txt
+        recaption: false
+        max_res: 1024
+        max_new_tokens: 192
+        thinking: false
+        batch_size: 1
+        caption_prompt: "Write one or two natural English sentences a person would type as an image prompt. Describe the adult subject's pose, camera distance, expression, how open the mouth is, costume, lighting, and background. Say that the subject is an adult woman or an adult man. Do not name a character, series, artist, or age. Do not use a booru tag list. Do not mention school, uniforms, or children. If the picture is not a clearly adult person, reply with only the word SKIP."

@@ -64,9 +64,9 @@ Dedupe is by source and numeric id. An existing `thumbnail_pass` row is kept if 
 1. Pull this branch on the home PC. Re-merge the local 13 Pixiv URLs if they are only in `catalog/_pixiv_windows_export.jsonl`.
 2. Run the three commands above. Review `catalog/_originals/` at full size. Delete a row when the series, character, or setting is child-coded. Do not commit the image files or the Chrome profile.
 3. Prefer human Pixiv drawings when a Civitai showcase and a Pixiv piece teach the same costume.
-4. Write `.txt` captions from `captions/README.md`. Do not train on booru tags alone.
-5. Anatomy (track B) is still an empty scaffold. Sort true join close-ups into `catalog/nsfw_anatomy_scaffold.csv` only after the same age screen and a full-size look.
-6. Only then, on official Qwen Image 2.1, train style (A) and anatomy (B) as two LoRAs. Character LoRA (C) waits.
+4. Stage originals into gitignored `train/data/` and write `.txt` captions (`captions/README.md`, `train/scripts/caption_originals.py`). Do not train on booru tags alone.
+5. Anatomy (track B) is still an empty scaffold. Sort true join close-ups into `catalog/_originals_anatomy/` and `catalog/nsfw_anatomy_scaffold.csv` only after the same age screen and a full-size look.
+6. On the OneThing H100, train style (A) then anatomy (B) from `train/README.md`. Copy the LoRAs off and shut the instance down. Character LoRA (C) waits. The configs do not start the instance.
 
 ## Not done
 

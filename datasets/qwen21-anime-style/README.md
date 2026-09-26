@@ -22,6 +22,8 @@ Metadata filters are not enough. 116 committed URLs had a thumbnail review on 20
 | `docs/style-selection-criteria.md` | What “anime style” means here, and what is excluded. |
 | `docs/nsfw-anatomy-scaffold.md` | Separate adult-anatomy track (B). No image URLs. |
 | `captions/README.md` | Natural-language captions for Qwen Image 2.1. |
+| `train/README.md` | Checklist: stage, caption, train style then anatomy, shut the H100 down. |
+| `train/configs/` | AI-Toolkit YAMLs. Style LoRA and anatomy LoRA are separate. |
 | `scripts/` | Civitai public API fetch, Pixiv public fetch, Windows home collector, merge. |
 | `PLAN_REVISION.md` | Track A is broad style, not mouth-only. |
 | `REPORT.md` | Counts and the next human review pass. |
@@ -46,7 +48,7 @@ Practical path:
 3. Download full-size `img-original` files with `scripts/download_pixiv_originals.py` into gitignored `catalog/_originals/`. The catalog rows themselves stay page URLs. Thumbs (`square1200`, `master1200`) are not the training files.
 4. Or copy bookmark URLs into `catalog/pixiv_urls.txt` (gitignored) and merge them with `scripts/merge_exports.py`.
 
-`scripts/collect_pixiv_windows.md` is the run order: log in, collect URLs, download originals, then dedupe.
+`scripts/collect_pixiv_windows.md` is the run order: log in, collect URLs, download originals, then dedupe. After a full-size review, `train/README.md` is the caption and H100 train checklist. Those commands do not start the instance.
 
 ## Rebuild
 

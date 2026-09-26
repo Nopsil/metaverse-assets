@@ -6,6 +6,8 @@ Qwen Image 2.1 follows descriptive text. The caption should look like the prompt
 
 One `.txt` file per image, same stem. AI-Toolkit reads `caption_ext: txt`. DiffSynth can use a `prompt` column in `metadata.csv`.
 
+`train/scripts/caption_originals.py` writes these files over gitignored `train/data/<track>/` and appends the anchor below. The run order is `train/README.md`. Do not commit the `.txt` files or the images.
+
 ## Style LoRA (track A)
 
 Describe what changes from picture to picture: pose, camera, expression, how open the mouth is, costume, light, background.

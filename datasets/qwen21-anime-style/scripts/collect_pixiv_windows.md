@@ -125,4 +125,4 @@ If you already merged 13 Pixiv rows on the home PC (129 URLs) and those commits 
 1. Review the files in `catalog/_originals/`. Delete a row when the series, character, or setting is child-coded. Do not delete a clearly adult character for a cute drawing style.
 2. Do not commit image files, cookies, or the dedicated Chrome profile.
 3. R-18 illustrations can stay on the style list when they are full drawings of adults. Close-up anatomy belongs in `catalog/nsfw_anatomy_scaffold.csv`, still with `safety_status=unreviewed` until you have checked the file.
-4. No training from this step.
+4. Caption and train only after that review. The checklist is `train/README.md` (stage, caption, H100, copy the LoRA, shut the instance down). Do not start the OneThing instance from this page.

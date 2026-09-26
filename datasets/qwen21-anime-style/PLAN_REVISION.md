@@ -18,6 +18,7 @@ The parent note split training into a mouth LoRA (A), an NSFW anatomy LoRA (B), 
 - Text encoder frozen for v1.
 - Fixed eval seed `26092755` when training eventually runs.
 - This revision does not train anything and does not use the GPU.
+- `train/configs/` is the AI-Toolkit scaffold (`arch: qwen_image_2`, official `Qwen/Qwen-Image-2.1`). Style and anatomy are separate YAMLs. `train/README.md` is the checklist. Those files do not start the OneThing instance.
 
 ## Data shape
 

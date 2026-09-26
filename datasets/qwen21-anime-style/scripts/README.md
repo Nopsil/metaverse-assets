@@ -53,3 +53,7 @@ That writes gitignored `catalog/_merged_preview.jsonl` and prints added, dropped
 ## Safety screen
 
 `safety.py` is the shared denylist (ages under 21, loli/shota, school, child-coded series, chibi, photoreal, furry, 3D). A cute face or stylized body is not a drop by itself. Child-coded characters stay out even when drawn looking older. Backslashes in booru tags are stripped before matching, so `suomi_\(girls'_frontline\)` still drops. `test_safety.py` and `test_home_collect.py` lock the examples. Passing the screen is not a visual approval.
+
+## After the files are on disk
+
+Caption and training are `../train/README.md`. `train/scripts/stage_dataset.py` copies full-size images into gitignored `train/data/`. `caption_originals.py` and `run_train.py` do not start a cloud instance. `run_train.py` without `--check` is the H100 training command, and it exits if no GPU is visible.
