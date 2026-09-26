@@ -19,6 +19,7 @@ from pathlib import Path
 
 from chrome_profile import default_dedicated_profile, validate_proxy
 from pixiv_browser import open_pixiv, require_windows
+from pixiv_pace import pause
 from pixiv_home import pixiv_block_reason
 from pixiv_originals import MAX_ORIGINAL_PAGES, bytes_match_original, file_name, originals_for_illust
 from pixiv_urls import parse_artwork_url
@@ -81,6 +82,10 @@ def pixiv_targets(rows: list[dict]) -> list[dict]:
         if not artwork_id.isdigit() or artwork_id in seen:
             continue
         if str(row.get("visual_review") or "") == "quarantine":
+            continue
+        if str(row.get("status") or "").lower() == "deprecated":
+            continue
+        if str(row.get("pool") or "") == "quarantine":
             continue
         if ref is None and source != "pixiv":
             continue
@@ -245,6 +250,7 @@ def download_one(page, target: dict, out_dir: Path) -> dict:
     existing = already_saved(out_dir, artwork_id)
     if existing:
         return {"id": artwork_id, "skip": "", "files": existing}
+    pause("page")
     page.goto(target["url"], wait_until="domcontentloaded", timeout=60000)
     detail = browser_json(page, f"https://www.pixiv.net/ajax/illust/{artwork_id}")
     body = detail.get("body") if isinstance(detail, dict) else None
@@ -265,6 +271,8 @@ def download_one(page, target: dict, out_dir: Path) -> dict:
     saved: list[str] = []
     sizes = plan.get("sizes") or []
     for index, url in enumerate(plan["urls"]):
+        if index:
+            pause("file")
         expect_w, expect_h = sizes[index] if index < len(sizes) else (0, 0)
         dest = out_dir / file_name(artwork_id, index, url)
         error = save_original(page, url, dest, expect_w, expect_h)
@@ -313,7 +321,6 @@ def main() -> None:
                 record = {"id": target["id"], "skip": "error", "files": [], "error": str(exc)[:160]}
             manifest.append(record)
             print(json.dumps(record, ensure_ascii=False), file=sys.stderr)
-            time.sleep(0.9)
     finally:
         context.close()
         playwright.stop()

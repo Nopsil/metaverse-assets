@@ -68,6 +68,8 @@ py -3 download_pixiv_originals.py --catalog ..\catalog\_pixiv_hot_export.jsonl -
 
 The downloader skips `visual_review=quarantine`. It still saves `img-original` only.
 
+Both scripts pause at random between page opens (about 3.5–14 seconds, sometimes up to half a minute) and between full-size files of the same work (about 2–8 seconds). They do not burst requests. Use only the dedicated profile and the local proxy.
+
 | Flag | Meaning |
 | --- | --- |
 | `--dedicated-profile` | Persistent Chrome user-data directory. Not the system Chrome profile. |

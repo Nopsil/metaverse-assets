@@ -22,6 +22,7 @@ from pathlib import Path
 from chrome_profile import default_dedicated_profile, validate_proxy
 from download_pixiv_originals import wait_for_profile
 from pixiv_browser import open_pixiv, require_windows
+from pixiv_pace import pause
 from pixiv_home import (
     ADULT_R18_QUERIES,
     HOT_BODY_QUERIES,
@@ -89,6 +90,8 @@ def make_fetch(page):
     def fetch_json(url: str) -> dict:
         last_status = 0
         for attempt in range(5):
+            if attempt == 0:
+                pause("page")
             result = page.evaluate(
                 """async (url) => {
                     const res = await fetch(url, {
@@ -166,7 +169,7 @@ def scrape(page, args) -> tuple[list[dict], dict]:
         fetch_json,
         include_ai=args.include_ai,
         dropped=dropped,
-        delay_s=0.35,
+        delay_s=0,
     )
     if args.mode == "hot":
         rows = _finish_hot_rows(rows, stubs, args, dropped, notes)
@@ -236,7 +239,7 @@ def _scrape_flexible_hot(fetch_json, args, dropped: Counter, notes: dict) -> tup
             fetch_json,
             include_ai=args.include_ai,
             dropped=dropped,
-            delay_s=0.35,
+            delay_s=0,
         )
         rows = _finish_hot_rows(rows, stubs, args, dropped, notes)
         if excluded:

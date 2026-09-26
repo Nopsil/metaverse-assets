@@ -295,6 +295,20 @@ class MergeTest(unittest.TestCase):
         self.assertEqual(blocked, [])
 
 
+class PaceTest(unittest.TestCase):
+    def test_page_and_file_pauses_stay_slow_and_uneven(self):
+        from pixiv_pace import human_pause
+
+        pages = [human_pause("page") for _ in range(60)]
+        files = [human_pause("file") for _ in range(40)]
+        self.assertGreaterEqual(min(pages), 3.5)
+        self.assertLessEqual(max(pages), 32.0)
+        self.assertGreater(max(pages) - min(pages), 2.0)
+        self.assertGreaterEqual(min(files), 1.8)
+        self.assertLessEqual(max(files), 8.0)
+        self.assertLess(min(files), min(pages))
+
+
 class FlexibleWindowTest(unittest.TestCase):
     def test_shortest_window_wins_and_spans_stay_ordered(self):
         from datetime import date
@@ -463,9 +477,19 @@ class HotSearchTest(unittest.TestCase):
 
         targets = pixiv_targets([
             {"source": "pixiv", "id": "10", "url": "https://www.pixiv.net/artworks/10", "visual_review": "quarantine"},
+            {"source": "pixiv", "id": "12", "url": "https://www.pixiv.net/artworks/12", "status": "deprecated", "visual_review": "thumbnail_pass"},
             {"source": "pixiv", "id": "11", "url": "https://www.pixiv.net/artworks/11", "visual_review": "pending"},
         ])
         self.assertEqual([item["id"] for item in targets], ["11"])
+
+    def test_merge_skips_deprecated_rows(self):
+        from merge_exports import merge_rows
+
+        base = [{"source": "pixiv", "id": "1", "status": "deprecated", "visual_review": "thumbnail_pass", "title": "old", "tags": ["a"]}]
+        incoming = [{"source": "pixiv", "id": "2", "pool": "quarantine", "title": "old", "tags": ["お姉さん"], "url": "https://www.pixiv.net/artworks/2"}]
+        merged, stats = merge_rows(base, incoming)
+        self.assertEqual(merged, [])
+        self.assertEqual(stats["deprecated_skipped"], 2)
 
 
 class CliTest(unittest.TestCase):
