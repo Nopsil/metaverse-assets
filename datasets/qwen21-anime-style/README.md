@@ -8,7 +8,7 @@ Nothing here trains a model. Other files in the assets repo are untouched.
 
 Zero minors. Rows must be clearly adult characters, or clean all-ages illustrations of adult-looking characters. School uniforms, child-coded series, stated ages under 21, chibi, and ambiguous age are out. If a picture is unclear, it does not belong in the set.
 
-Metadata filters are not enough. The previous candidate table, including its thumbnail pass, is train-unready under `catalog/quarantine/poor-aesthetic-20260927/` with `status=deprecated`. Its originals stay on disk for audit and are excluded from staging. The active list is the fresh popularity-ranked Pixiv set with `visual_review=pending`. A date window is optional. Prefer a clean adult nude or near-nude with a simple, character-focused composition; busy multi-panel scenes stay out. **Every URL still needs a full-size look of the original file before training.**
+Metadata filters are not enough. The previous candidate table, including its thumbnail pass, is train-unready under `catalog/quarantine/poor-aesthetic-20260927/` with `status=deprecated`. Its originals stay on disk for audit and are excluded from staging. The active list is the fresh popularity-ranked Pixiv set with `visual_review=pending`. A date window is optional. Prefer one commercial color figure with a readable silhouette. Full nude is not required; clothes pulled aside stay when the body line is clear. Busy multi-panel scenes stay out. **Every URL still needs a full-size look of the original file before training.**
 
 ## Layout
 

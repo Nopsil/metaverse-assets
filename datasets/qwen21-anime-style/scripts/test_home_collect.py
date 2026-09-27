@@ -75,6 +75,10 @@ class HomeCollectTest(unittest.TestCase):
         )
         self.assertEqual(row_from_illust_body(_adult_body(xRestrict=2))[1], "r18g")
         self.assertEqual(row_from_illust_body(_adult_body(aiType=2))[1], "ai_generated")
+        self.assertEqual(row_from_illust_body(_adult_body(pageCount=3))[1], "pass")
+        self.assertIsNotNone(row_from_illust_body(_adult_body(pageCount=2))[0])
+        self.assertEqual(row_from_illust_body(_adult_body(pageCount=4))[1], "multi_page")
+        self.assertIsNone(row_from_illust_body(_adult_body(pageCount=3, title="合法ロリ"))[0])
         kept, why = row_from_illust_body(_adult_body(aiType=2), include_ai=True)
         self.assertEqual(why, "pass", kept)
 
@@ -337,11 +341,18 @@ class FlexibleWindowTest(unittest.TestCase):
         from pixiv_home import queries_for_buckets, thin_bucket_allowed, validate_queries
 
         slim = queries_for_buckets(["slim"])
-        self.assertTrue(slim)
-        self.assertTrue(all(bucket == "slim" for bucket, _word in slim))
+        self.assertTrue(any(bucket == "slim" and word == "スレンダー" for bucket, word in slim))
+        self.assertTrue(any(word == "お姉さん" for _bucket, word in slim))
+        self.assertTrue(all(bucket in {"slim", "setting"} for bucket, _word in slim))
         validate_queries([word for _bucket, word in slim])
-        self.assertFalse(thin_bucket_allowed("slim", ["スレンダー", "オリジナル"], "夜"))
+        self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "オリジナル"], "夜"))
         self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "お姉さん"], "夜"))
+        self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "女性"], "夜"))
+        self.assertTrue(thin_bucket_allowed("flat", ["貧乳", "美人"], "夜"))
+        self.assertTrue(thin_bucket_allowed("petite", ["細身", "女上司"], "夜"))
+        self.assertTrue(thin_bucket_allowed("flat", ["ちっぱい", "未亡人"], "夜"))
+        self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "OL"], "夜"))
+        self.assertFalse(thin_bucket_allowed("slim", ["スレンダー", "R-18"], "夜"))
         self.assertTrue(thin_bucket_allowed("curvy", ["巨乳", "オリジナル"], "夜"))
 
     def test_petite_flat_queries_stay_adult_and_reject_large_chests(self):
@@ -350,9 +361,19 @@ class FlexibleWindowTest(unittest.TestCase):
         pairs = queries_for_buckets(["petite", "flat"])
         words = [word for _bucket, word in pairs]
         validate_queries(words)
-        self.assertTrue(any("ちっぱい" in word and "お姉さん" in word for word in words))
-        self.assertTrue(any("小柄" in word for word in words))
-        self.assertTrue(any("人妻" in word for word in words))
+        thin_words = [word for bucket, word in pairs if bucket in {"petite", "flat", "setting"}]
+        self.assertTrue(all(" " not in word for word in thin_words))
+        self.assertIn("ちっぱい", words)
+        self.assertIn("お姉さん", words)
+        self.assertIn("小柄", words)
+        self.assertIn("人妻", words)
+        self.assertIn("オリジナル", words)
+        from pixiv_home import thin_bucket_from_tags
+
+        self.assertEqual(thin_bucket_from_tags(["貧乳", "お姉さん"], ""), "flat")
+        self.assertEqual(thin_bucket_from_tags(["細身", "熟女"], ""), "petite")
+        self.assertEqual(thin_bucket_from_tags(["スレンダー", "巨乳", "人妻"], ""), "slim")
+        self.assertEqual(thin_bucket_from_tags(["巨乳", "お姉さん"], ""), "")
         self.assertTrue(small_body_ok("flat", ["貧乳", "お姉さん", "全裸"], "夜"))
         self.assertFalse(small_body_ok("flat", ["貧乳", "巨乳", "お姉さん"], "夜"))
         self.assertFalse(small_body_ok("flat", ["お姉さん", "全裸"], "夜"))
@@ -408,6 +429,8 @@ class HotSearchTest(unittest.TestCase):
         self.assertTrue(is_rough_work(["下絵", "お姉さん"], ""))
         self.assertTrue(is_rough_work(["お姉さん"], "WIP"))
         self.assertTrue(prefers_simple_silhouette(["全裸", "白背景"], ""))
+        self.assertTrue(prefers_simple_silhouette(["半脱", "お姉さん"], ""))
+        self.assertTrue(prefers_simple_silhouette(["たくしあげ"], "胸はだけ"))
         self.assertFalse(prefers_simple_silhouette(["裸足", "お姉さん"], ""))
         rows = [
             {"id": "1", "body_bucket": "average", "bookmark_count": 1000, "user_id": "a", "tags": ["お姉さん"]},

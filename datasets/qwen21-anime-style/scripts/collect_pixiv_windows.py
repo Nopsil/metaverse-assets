@@ -284,9 +284,27 @@ def _rejected_catalog() -> Path:
     return HERE.parent / "catalog" / "quarantine" / "failed-review" / "rejected.jsonl"
 
 
+def _male_genitalia_catalog() -> Path:
+    return HERE.parent / "catalog" / "quarantine" / "male-genitalia-20260927" / "rejected.jsonl"
+
+
+def _comic_plate_catalog() -> Path:
+    return HERE.parent / "catalog" / "quarantine" / "bm5k-comic-20260927" / "rejected.jsonl"
+
+
+def _expand_drop_catalog() -> Path:
+    return HERE.parent / "catalog" / "quarantine" / "bm5k-expand-drop-20260927" / "rejected.jsonl"
+
+
 def _skip_ids(extra: Path | None) -> set[str]:
-    """Caller excludes plus artwork ids that already failed full-size review."""
-    return _excluded_ids(extra) | _excluded_ids(_rejected_catalog())
+    """Caller excludes plus artwork ids that already failed review or a hard drop."""
+    return (
+        _excluded_ids(extra)
+        | _excluded_ids(_rejected_catalog())
+        | _excluded_ids(_male_genitalia_catalog())
+        | _excluded_ids(_comic_plate_catalog())
+        | _excluded_ids(_expand_drop_catalog())
+    )
 
 
 def _drop_skipped(rows: list[dict], skip: set[str], dropped: Counter) -> list[dict]:
@@ -365,7 +383,7 @@ def _finish_hot_rows(rows, stubs, args, dropped: Counter, notes: dict) -> list[d
             row["quality"] = stub_count
         window = f"{args.start_date}..{args.end_date}" if dated else "no date window"
         simple = prefers_simple_silhouette(row.get("tags") or [], str(row.get("title") or ""))
-        silhouette = " Tags suggest a simple nude or near-nude figure." if simple else ""
+        silhouette = " Tags suggest a readable silhouette (nude, near-nude, or clothes pulled aside)." if simple else ""
         row["keep_reason"] = (
             f"Popular R-18 search {window} "
             f"({row.get('body_bucket')}, {row.get('bookmark_count')} bookmarks). "

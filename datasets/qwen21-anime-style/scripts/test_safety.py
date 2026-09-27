@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from safety import has_person_signal, rating_for, screen
+from safety import has_person_signal, male_genitalia_reason, rating_for, screen
 
 
 class ScreenTest(unittest.TestCase):
@@ -62,6 +62,19 @@ class ScreenTest(unittest.TestCase):
         self.assertFalse(screen("original", tags=["JK"])[0])
         self.assertFalse(screen("original", tags=["ちび"])[0])
         self.assertTrue(screen("original woman", tags=["女の子", "オリジナル"])[0])
+
+    def test_blocks_male_genitalia_and_futanari(self):
+        self.assertFalse(screen("お姉さん ふたなり オリジナル")[0])
+        self.assertFalse(screen("細身", tags=["チンポ", "女性"])[0])
+        self.assertFalse(screen("futanari dickgirl")[0])
+        self.assertFalse(screen("貧乳 ペニス")[0])
+        self.assertFalse(screen("ちんこ 人妻")[0])
+        self.assertFalse(screen("男根")[0])
+        self.assertFalse(screen("お姉さん 射精 ふたなり")[0])
+        self.assertIsNotNone(male_genitalia_reason("ふたなり", ["お姉さん"]))
+        ok, reason = screen("お姉さん オリジナル 射精", tags=["女性", "貧乳"])
+        self.assertTrue(ok, reason)
+        self.assertIsNone(male_genitalia_reason("お姉さん 射精", ["女性", "貧乳"]))
 
     def test_flags(self):
         self.assertFalse(screen("adult woman", minor_flag=True)[0])
