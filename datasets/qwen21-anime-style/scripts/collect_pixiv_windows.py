@@ -284,9 +284,17 @@ def _rejected_catalog() -> Path:
     return HERE.parent / "catalog" / "quarantine" / "failed-review" / "rejected.jsonl"
 
 
+def _male_genitalia_catalog() -> Path:
+    return HERE.parent / "catalog" / "quarantine" / "male-genitalia-20260927" / "rejected.jsonl"
+
+
 def _skip_ids(extra: Path | None) -> set[str]:
-    """Caller excludes plus artwork ids that already failed full-size review."""
-    return _excluded_ids(extra) | _excluded_ids(_rejected_catalog())
+    """Caller excludes plus artwork ids that already failed review or the genitalia drop."""
+    return (
+        _excluded_ids(extra)
+        | _excluded_ids(_rejected_catalog())
+        | _excluded_ids(_male_genitalia_catalog())
+    )
 
 
 def _drop_skipped(rows: list[dict], skip: set[str], dropped: Counter) -> list[dict]:

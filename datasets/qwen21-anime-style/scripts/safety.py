@@ -199,6 +199,29 @@ _JA_AND_SERIES = [
     "ドキドキ文芸部",
 ]
 
+# Visible male genitalia and futanari. A female-body page with these tags is a
+# hard drop. 射精 alone is not: it is also used on female-only pages. 射精 drops
+# when one of these words is in the same title or tags.
+_MALE_GENITALIA = [
+    "ふたなり",
+    "フタナリ",
+    "futanari",
+    "futa nari",
+    "dickgirl",
+    "dick girl",
+    "ペニス",
+    "ぺにす",
+    "penis",
+    "ちんこ",
+    "ちんぽ",
+    "チンポ",
+    "ちんちん",
+    "チンチン",
+    "男根",
+    "陰茎",
+    "包茎",
+]
+
 _SERIES_EN = [
     "hatsune miku",
     "kagamine rin",
@@ -370,6 +393,10 @@ def screen(
         if phrase.lower() in norm:
             return False, f"term:{phrase}"
 
+    genital = _male_genitalia_hit(norm)
+    if genital:
+        return False, genital
+
     for phrase in _SERIES_EN:
         if normalize(phrase) in norm:
             return False, f"series:{phrase}"
@@ -391,6 +418,25 @@ def screen(
         return False, "term:loli"
 
     return True, "pass"
+
+
+def _male_genitalia_hit(norm: str) -> str | None:
+    """Male genitalia or futanari in an already-normalized title/tag string."""
+    for phrase in _MALE_GENITALIA:
+        if phrase.lower() in norm:
+            return f"term:{phrase}"
+    return None
+
+
+def male_genitalia_reason(text: str, tags: Iterable[str] | None = None) -> str | None:
+    """Drop reason when title or tags show male genitalia or futanari.
+
+    射精 by itself is not a drop. It drops when a penis or futanari word is
+    also present, because that word matches first.
+    """
+    tag_list = list(tags or [])
+    norm = normalize(" ".join([text or "", *map(str, tag_list)]))
+    return _male_genitalia_hit(norm)
 
 
 def has_person_signal(text: str, tags: Iterable[str] | None = None) -> bool:
