@@ -18,6 +18,8 @@ class ScreenTest(unittest.TestCase):
         self.assertFalse(screen("beautiful 16yo schoolgirl, serafuku")[0])
         self.assertFalse(screen("18 years old woman in a classroom")[0])
         self.assertFalse(screen("高校生 制服 女の子")[0])
+        self.assertFalse(screen("スク水 お姉さん オリジナル")[0])
+        self.assertFalse(screen("スクール水着 人妻")[0])
         self.assertFalse(screen("title 男子中学生だった", tags=["オリジナル"])[0])
         self.assertEqual(screen("she is 25 years old, anime woman")[0], True)
 

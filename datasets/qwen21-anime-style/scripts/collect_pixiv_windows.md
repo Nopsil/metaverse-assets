@@ -56,7 +56,11 @@ A date window is optional. `--date-windows 7,30,90,180,365` widens until each ad
 py -3 collect_pixiv_windows.py --mode hot --limit 48 --pages 2 --order popular --date-windows 7,30,90,180,365 --min-bookmarks 1000 --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890 --exclude ..\catalog\quarantine\poor-aesthetic-20260927\style_candidates.jsonl --out ..\catalog\_pixiv_hot_export.jsonl
 ```
 
-Queries stay on adult fictional looks and are balanced across curvy, average, slim, petite, and flat. Child-coded, school, and under-21 text still drop. Sketches (`ラフ`, `落書き`, `下描き`), `作画崩壊`, and busy scenes (`漫画`, `4コマ`, `集合絵`, clutter tags) drop before the detail fetch. Equal bookmark counts prefer a simple nude or plain background. A kept row is `pool=hot` and still needs a full-size look. Ids in `catalog/quarantine/failed-review/rejected.jsonl` are skipped. `142269340` is on that list.
+Queries stay on adult fictional looks and are balanced across curvy, average, slim, petite, and flat. Child-coded, school, and under-21 text still drop. School swimsuits (`スク水`, `スクール水着`) and `生徒` drop with the other school cues. Sketches (`ラフ`, `落書き`, `下描き`, `下絵`, `未完成`), `作画崩壊`, comics (`漫画`, `4コマ`, `2コマ`, `コマシリーズ`, speech bubbles, SFX), and group-count tags (`2girls`, `複数人`, `ハーレム`) drop before the detail fetch. Equal bookmark counts prefer a simple nude or plain background.
+
+The finish bar is the four gold-reference plates in `catalog/_gold_refs_notes.md` (`82423316`, `84328482`, `91035822`, `97016970`): one adult figure, clean line, soft polished shading, and a plain or nearly plain background. A petite or small-chest adult is part of that bar. A full-size look still has to match it. Cluttered rooms, rough paint, extra figures, and comic panels are not kept just because the bookmark count is high.
+
+A kept row is `pool=hot` and still needs a full-size look. Ids in `catalog/quarantine/failed-review/rejected.jsonl` are skipped. `142269340` is on that list. The 2026-09-27 hot table that failed that look is `catalog/quarantine/failed-aesthetic-20260927/`. Do not merge it back.
 
 The previous candidate table is `status=deprecated` under `catalog/quarantine/poor-aesthetic-20260927/`. Its originals and later rejected downloads are under `catalog/quarantine/pre-hot-rerank/`. Do not merge that table back in. Publish the hot export as the active list, then download into `catalog/_originals_hot/` (gitignored). `stage_dataset.py` refuses the quarantine folders and `catalog/_originals`.
 

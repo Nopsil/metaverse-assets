@@ -41,6 +41,8 @@ from pixiv_home import (
     iter_hot_r18_search,
     iter_r18_search,
     is_busy_scene,
+    is_group_plate,
+    is_rough_work,
     parse_date_windows,
     prefers_simple_silhouette,
     pixiv_block_reason,
@@ -380,7 +382,11 @@ def _finish_hot_rows(rows, stubs, args, dropped: Counter, notes: dict) -> list[d
         if dated and not in_date_window(day, args.start_date, args.end_date):
             dropped["outside_date"] += 1
             continue
-        if is_busy_scene(row.get("tags") or [], str(row.get("title") or "")):
+        if (
+            is_busy_scene(row.get("tags") or [], str(row.get("title") or ""))
+            or is_group_plate(row.get("tags") or [], str(row.get("title") or ""))
+            or is_rough_work(row.get("tags") or [], str(row.get("title") or ""))
+        ):
             dropped["busy_scene"] += 1
             continue
         if not small_body_ok(str(row.get("body_bucket") or ""), row.get("tags") or [], str(row.get("title") or "")):
