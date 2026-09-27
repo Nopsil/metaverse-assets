@@ -49,7 +49,11 @@ def queries_for_body(which: str) -> list[str]:
 # A posting window is optional. Popularity rank (order=popular_d) is the default.
 # 2026-04-01..2026-10-31 is only an example when the caller passes dates.
 # Child-coded, school, and under-21 words are not searched.
-# Nude queries sit beside the body queries so a simple adult silhouette can rank.
+# Nude and body words are separate searches. Pixiv s_tag ANDs every word, so
+# "細身 貧乳 お姉さん" returns almost nothing at a 2000 bookmark floor.
+# Slim, petite, and flat use one high-signal tag each. Adult-setting words are
+# their own queries; a hit is kept only when the work itself has an adult
+# setting and a matching body tag. Child-coded words are not searched.
 HOT_KEEP_START = "2026-04-01"
 HOT_KEEP_END = "2026-10-31"
 HOT_BODY_QUERIES = (
@@ -58,52 +62,19 @@ HOT_BODY_QUERIES = (
     ("average", "お姉さん オリジナル"),
     ("average", "普通体型 女性 オリジナル"),
     ("average", "全裸 お姉さん"),
-    ("slim", "スレンダー お姉さん"),
-    ("slim", "スレンダー 人妻"),
-    ("slim", "スレンダー 熟女"),
-    ("slim", "スレンダー 全裸 お姉さん"),
-    ("petite", "細身 お姉さん"),
-    ("petite", "華奢 お姉さん"),
-    ("petite", "細身 人妻"),
-    ("petite", "華奢 人妻"),
-    ("petite", "細身 熟女"),
-    ("petite", "小柄 お姉さん"),
-    ("petite", "低身長 お姉さん"),
-    ("petite", "細身 全裸 お姉さん"),
-    ("petite", "華奢 全裸 お姉さん"),
-    ("petite", "小柄 全裸 お姉さん"),
-    ("petite", "細身 貧乳 お姉さん"),
-    ("petite", "華奢 貧乳 お姉さん"),
-    ("petite", "小柄 貧乳 お姉さん"),
-    ("petite", "低身長 貧乳 お姉さん"),
-    ("petite", "細身 微乳 お姉さん"),
-    ("petite", "華奢 微乳 お姉さん"),
-    ("petite", "小柄 ちっぱい お姉さん"),
-    ("petite", "華奢 ちっぱい お姉さん"),
-    ("petite", "細身 無乳 お姉さん"),
-    ("petite", "小柄 人妻"),
-    ("petite", "低身長 人妻"),
-    ("petite", "華奢 熟女"),
-    ("petite", "低身長 女性"),
-    ("petite", "低身長 成人"),
-    ("flat", "スレンダー 微乳"),
-    ("flat", "スレンダー 貧乳"),
-    ("flat", "ちっぱい スレンダー"),
-    ("flat", "成人 貧乳"),
-    ("flat", "貧乳 お姉さん"),
-    ("flat", "微乳 お姉さん"),
-    ("flat", "貧乳 人妻"),
-    ("flat", "微乳 人妻"),
-    ("flat", "貧乳 熟女"),
-    ("flat", "微乳 熟女"),
-    ("flat", "ちっぱい お姉さん"),
-    ("flat", "ちっぱい 人妻"),
-    ("flat", "貧乳 女上司"),
-    ("flat", "無乳 お姉さん"),
-    ("flat", "スレンダー 貧乳 お姉さん"),
-    ("flat", "貧乳 全裸 お姉さん"),
-    ("flat", "微乳 全裸 お姉さん"),
-    ("flat", "ちっぱい 全裸 お姉さん"),
+    ("slim", "スレンダー"),
+    ("petite", "細身"),
+    ("petite", "華奢"),
+    ("petite", "小柄"),
+    ("petite", "低身長"),
+    ("flat", "貧乳"),
+    ("flat", "微乳"),
+    ("flat", "ちっぱい"),
+    ("flat", "無乳"),
+    ("setting", "お姉さん"),
+    ("setting", "人妻"),
+    ("setting", "熟女"),
+    ("setting", "オリジナル"),
 )
 HOT_BUCKETS = ("curvy", "average", "slim", "petite", "flat")
 THIN_BUCKETS = ("slim", "petite", "flat")
@@ -122,7 +93,12 @@ def queries_for_buckets(buckets: list[str] | None) -> tuple[tuple[str, str], ...
     unknown = wanted.difference(HOT_BUCKETS)
     if unknown:
         raise RuntimeError(f"Unknown body bucket {sorted(unknown)}")
-    return tuple(item for item in HOT_BODY_QUERIES if item[0] in wanted)
+    selected = [item for item in HOT_BODY_QUERIES if item[0] in wanted]
+    # Adult-setting searches are not a body bucket. Include them whenever a
+    # thin bucket is requested so a popular お姉さん page can still fill flat.
+    if wanted.intersection(THIN_BUCKETS):
+        selected.extend(item for item in HOT_BODY_QUERIES if item[0] == "setting")
+    return tuple(selected)
 
 
 def has_adult_setting(tags: list[str], title: str = "") -> bool:
@@ -143,6 +119,26 @@ def thin_bucket_allowed(bucket: str, tags: list[str], title: str = "") -> bool:
 _LARGE_CHEST = ("巨乳", "爆乳", "超乳", "デカパイ", "デカ乳", "でかぱい", "巨乳輪")
 _FLAT_MARKERS = ("貧乳", "微乳", "ちっぱい", "無乳")
 _PETITE_MARKERS = ("細身", "華奢", "小柄", "低身長", "貧乳", "微乳", "ちっぱい", "無乳")
+
+
+_PETITE_FRAME = ("細身", "華奢", "小柄", "低身長")
+
+
+def thin_bucket_from_tags(tags: list[str] | str, title: str = "") -> str:
+    """Map a broad adult-setting hit onto slim, petite, or flat.
+
+    Flat wins over a short frame when both are tagged. A large chest is not
+    flat or petite. スレンダー with a large chest stays slim.
+    """
+    blob = " ".join(_text_blobs(tags, title))
+    large = any(word in blob for word in _LARGE_CHEST)
+    if not large and any(word in blob for word in _FLAT_MARKERS):
+        return "flat"
+    if not large and any(word in blob for word in _PETITE_FRAME):
+        return "petite"
+    if "スレンダー" in blob:
+        return "slim"
+    return ""
 
 
 def small_body_ok(bucket: str, tags: list[str] | str, title: str = "") -> bool:
@@ -745,6 +741,7 @@ def iter_hot_r18_search(
         "skipped": {},
     }
     skipped: dict[str, int] = notes["skipped"]
+    wanted_buckets = {bucket for bucket, _word in chosen if bucket in HOT_BUCKETS}
 
     def bump(reason: str) -> None:
         skipped[reason] = int(skipped.get(reason) or 0) + 1
@@ -812,10 +809,16 @@ def iter_hot_r18_search(
                 if not ok:
                     bump("screen")
                     continue
-                if not thin_bucket_allowed(bucket, tag_list, title):
+                assigned = bucket
+                if bucket == "setting":
+                    assigned = thin_bucket_from_tags(tag_list, title)
+                    if assigned not in wanted_buckets:
+                        bump("not_thin_body")
+                        continue
+                if not thin_bucket_allowed(assigned, tag_list, title):
                     bump("no_adult_setting")
                     continue
-                if not small_body_ok(bucket, tag_list, title):
+                if not small_body_ok(assigned, tag_list, title):
                     bump("body_mismatch")
                     continue
                 day = create_day(str(item.get("createDate") or ""))
@@ -828,8 +831,8 @@ def iter_hot_r18_search(
                         continue
                 seen.add(artwork_id)
                 stub = dict(item)
-                stub["_body_bucket"] = bucket
-                groups[bucket].append(stub)
+                stub["_body_bucket"] = assigned
+                groups[assigned].append(stub)
                 kept_for_query += 1
             if restricted_on_page == 0:
                 notes["masked_queries"] += 1

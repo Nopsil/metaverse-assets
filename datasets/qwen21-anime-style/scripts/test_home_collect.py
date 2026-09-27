@@ -337,8 +337,9 @@ class FlexibleWindowTest(unittest.TestCase):
         from pixiv_home import queries_for_buckets, thin_bucket_allowed, validate_queries
 
         slim = queries_for_buckets(["slim"])
-        self.assertTrue(slim)
-        self.assertTrue(all(bucket == "slim" for bucket, _word in slim))
+        self.assertTrue(any(bucket == "slim" and word == "スレンダー" for bucket, word in slim))
+        self.assertTrue(any(word == "お姉さん" for _bucket, word in slim))
+        self.assertTrue(all(bucket in {"slim", "setting"} for bucket, _word in slim))
         validate_queries([word for _bucket, word in slim])
         self.assertFalse(thin_bucket_allowed("slim", ["スレンダー", "オリジナル"], "夜"))
         self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "お姉さん"], "夜"))
@@ -350,9 +351,19 @@ class FlexibleWindowTest(unittest.TestCase):
         pairs = queries_for_buckets(["petite", "flat"])
         words = [word for _bucket, word in pairs]
         validate_queries(words)
-        self.assertTrue(any("ちっぱい" in word and "お姉さん" in word for word in words))
-        self.assertTrue(any("小柄" in word for word in words))
-        self.assertTrue(any("人妻" in word for word in words))
+        thin_words = [word for bucket, word in pairs if bucket in {"petite", "flat", "setting"}]
+        self.assertTrue(all(" " not in word for word in thin_words))
+        self.assertIn("ちっぱい", words)
+        self.assertIn("お姉さん", words)
+        self.assertIn("小柄", words)
+        self.assertIn("人妻", words)
+        self.assertIn("オリジナル", words)
+        from pixiv_home import thin_bucket_from_tags
+
+        self.assertEqual(thin_bucket_from_tags(["貧乳", "お姉さん"], ""), "flat")
+        self.assertEqual(thin_bucket_from_tags(["細身", "熟女"], ""), "petite")
+        self.assertEqual(thin_bucket_from_tags(["スレンダー", "巨乳", "人妻"], ""), "slim")
+        self.assertEqual(thin_bucket_from_tags(["巨乳", "お姉さん"], ""), "")
         self.assertTrue(small_body_ok("flat", ["貧乳", "お姉さん", "全裸"], "夜"))
         self.assertFalse(small_body_ok("flat", ["貧乳", "巨乳", "お姉さん"], "夜"))
         self.assertFalse(small_body_ok("flat", ["お姉さん", "全裸"], "夜"))
