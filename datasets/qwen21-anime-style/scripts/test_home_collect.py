@@ -68,6 +68,11 @@ class HomeCollectTest(unittest.TestCase):
         self.assertIsNone(row_from_illust_body(_adult_body(title="合法ロリ"))[0])
         self.assertIsNone(row_from_illust_body(_adult_body(description="16yo schoolgirl"))[0])
         self.assertIsNone(row_from_illust_body(_adult_body(title="セーラー服"))[0])
+        self.assertEqual(row_from_illust_body(_adult_body(title="即堕ち2コマシリーズ"))[1], "rough_or_busy")
+        self.assertEqual(
+            row_from_illust_body(_adult_body(tags={"tags": [{"tag": "2girls"}, {"tag": "お姉さん"}]}))[1],
+            "rough_or_busy",
+        )
         self.assertEqual(row_from_illust_body(_adult_body(xRestrict=2))[1], "r18g")
         self.assertEqual(row_from_illust_body(_adult_body(aiType=2))[1], "ai_generated")
         kept, why = row_from_illust_body(_adult_body(aiType=2), include_ai=True)
@@ -390,9 +395,18 @@ class HotSearchTest(unittest.TestCase):
     def test_busy_scenes_drop_and_simple_nudes_rank_first_on_a_tie(self):
         from pixiv_home import is_busy_scene, prefers_simple_silhouette, select_hot_rows
 
+        from pixiv_home import is_group_plate, is_rough_work
+
         self.assertTrue(is_busy_scene(["お姉さん", "4コマ"], "漫画"))
         self.assertTrue(is_busy_scene(["集合絵"], ""))
+        self.assertTrue(is_busy_scene(["即堕ち2コマシリーズ", "お姉さん"], ""))
+        self.assertTrue(is_busy_scene(["吹き出し"], ""))
         self.assertFalse(is_busy_scene(["全裸", "お姉さん", "白背景"], "夜"))
+        self.assertTrue(is_group_plate(["2girls", "お姉さん"], ""))
+        self.assertTrue(is_group_plate(["ハーレム"], "三人"))
+        self.assertFalse(is_group_plate(["全裸", "お姉さん", "白背景"], "夜"))
+        self.assertTrue(is_rough_work(["下絵", "お姉さん"], ""))
+        self.assertTrue(is_rough_work(["お姉さん"], "WIP"))
         self.assertTrue(prefers_simple_silhouette(["全裸", "白背景"], ""))
         self.assertFalse(prefers_simple_silhouette(["裸足", "お姉さん"], ""))
         rows = [

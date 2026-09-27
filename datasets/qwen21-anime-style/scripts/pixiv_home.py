@@ -248,6 +248,24 @@ def bookmark_count(item: dict) -> int | None:
     return None
 
 
+_ROUGH_EXACT = {
+    "落書き",
+    "らくがき",
+    "下描き",
+    "下書き",
+    "練習",
+    "練習絵",
+    "作画崩壊",
+    "下絵",
+    "未完成",
+    "雑絵",
+    "線画ラフ",
+    "wip",
+    "sketch",
+}
+_ROUGH_PARTS = ("落書き", "下描き", "下書き", "作画崩壊", "下絵", "未完成", "雑絵", "sketch")
+
+
 def is_rough_work(tags: list[str], title: str = "") -> bool:
     """Drop sketches and tagged broken drawings before they enter the hot set."""
     blobs = [str(title or "")]
@@ -256,9 +274,10 @@ def is_rough_work(tags: list[str], title: str = "") -> bool:
         token = blob.strip()
         if not token:
             continue
-        if token in {"落書き", "らくがき", "下描き", "下書き", "練習", "練習絵", "作画崩壊"}:
+        lower = token.lower()
+        if token in _ROUGH_EXACT or lower in _ROUGH_EXACT:
             return True
-        if "落書き" in token or "下描き" in token or "下書き" in token or "作画崩壊" in token:
+        if any(part in lower for part in _ROUGH_PARTS):
             return True
         if token == "ラフ" or token.startswith("ラフ"):
             return True
@@ -279,7 +298,51 @@ BUSY_SCENE_MARKERS = (
     "集合絵",
     "ごちゃごちゃ",
     "背景重視",
+    "2コマ",
+    "3コマ",
+    "コマシリーズ",
+    "コミック",
+    "読み切り",
+    "連載",
+    "吹き出し",
+    "フキダシ",
+    "効果音",
+    "擬音",
+    "オノマトペ",
+    "4koma",
+    "yonkoma",
+    "comic",
+    "manga",
 )
+# Count tags for a second figure or a crowd. A single adult plate is the keep.
+GROUP_PLATE_PARTS = (
+    "2girls",
+    "3girls",
+    "4girls",
+    "5girls",
+    "6girls",
+    "multiple girls",
+    "multiple boys",
+    "2boys",
+    "3boys",
+    "女の子2人",
+    "女の子3人",
+    "女の子4人",
+    "複数の女の子",
+    "複数人",
+    "複数プレイ",
+    "モブ",
+    "群衆",
+    "集団",
+    "大勢",
+    "ハーレム",
+    "乱交",
+    "双子",
+    "二人",
+    "三人",
+    "四人",
+)
+GROUP_PLATE_EXACT = {"3p", "4p", "5p", "6p", "2人", "3人", "4人"}
 # Exact tags, or a tag that contains one of the longer phrases. Bare 裸 is exact
 # so 裸足 does not count. Used as a rank tie-break, not a requirement.
 SIMPLE_SILHOUETTE_EXACT = {
@@ -311,6 +374,17 @@ def is_busy_scene(tags: list[str] | str, title: str = "") -> bool:
     """Drop tagged comics, multi-panel pages, and cluttered backgrounds."""
     for blob in _text_blobs(tags, title):
         if any(marker in blob for marker in BUSY_SCENE_MARKERS):
+            return True
+    return False
+
+
+def is_group_plate(tags: list[str] | str, title: str = "") -> bool:
+    """Drop a crowd or a second figure. The gold bar is one adult on one plate."""
+    for blob in _text_blobs(tags, title):
+        lower = blob.lower().replace("_", " ")
+        if lower in GROUP_PLATE_EXACT:
+            return True
+        if any(part in lower for part in GROUP_PLATE_PARTS):
             return True
     return False
 
@@ -475,6 +549,8 @@ def row_from_illust_body(body: dict, *, include_ai: bool = False) -> tuple[dict 
     ok, why = screen(blob, tags, lo_flag=bool(body.get("lo")))
     if not ok:
         return None, why
+    if is_rough_work(tags, title) or is_busy_scene(tags, title) or is_group_plate(tags, title):
+        return None, "rough_or_busy"
     if not has_person_signal(blob, tags):
         return None, "no_person"
     pages = int(body.get("pageCount") or 1)
@@ -638,7 +714,8 @@ def iter_hot_r18_search(
     are set, scd/ecd are padded by one day because Pixiv treats them as
     after/before, and rows outside the inclusive keep window are dropped when
     the stub has a create date. Slim, petite, and flat stubs also need an
-    adult-setting tag. Tagged comics and cluttered scenes are dropped.
+    adult-setting tag. Tagged comics, sketches, speech bubbles, and
+    multi-figure plates are dropped before the detail fetch.
     """
     chosen = queries if queries is not None else HOT_BODY_QUERIES
     validate_queries([word for _bucket, word in chosen])
@@ -728,7 +805,7 @@ def iter_hot_r18_search(
                     notes["ai_stubs"] = int(notes.get("ai_stubs") or 0) + 1
                     bump("ai")
                     continue
-                if is_rough_work(tag_list, title) or is_busy_scene(tag_list, title):
+                if is_rough_work(tag_list, title) or is_busy_scene(tag_list, title) or is_group_plate(tag_list, title):
                     bump("rough_or_busy")
                     continue
                 ok, _why = screen(" ".join([title, *tag_list]), tag_list)
