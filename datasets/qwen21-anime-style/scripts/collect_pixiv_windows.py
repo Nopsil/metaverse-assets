@@ -292,6 +292,10 @@ def _comic_plate_catalog() -> Path:
     return HERE.parent / "catalog" / "quarantine" / "bm5k-comic-20260927" / "rejected.jsonl"
 
 
+def _expand_drop_catalog() -> Path:
+    return HERE.parent / "catalog" / "quarantine" / "bm5k-expand-drop-20260927" / "rejected.jsonl"
+
+
 def _skip_ids(extra: Path | None) -> set[str]:
     """Caller excludes plus artwork ids that already failed review or a hard drop."""
     return (
@@ -299,6 +303,7 @@ def _skip_ids(extra: Path | None) -> set[str]:
         | _excluded_ids(_rejected_catalog())
         | _excluded_ids(_male_genitalia_catalog())
         | _excluded_ids(_comic_plate_catalog())
+        | _excluded_ids(_expand_drop_catalog())
     )
 
 
