@@ -78,7 +78,22 @@ HOT_BODY_QUERIES = (
 )
 HOT_BUCKETS = ("curvy", "average", "slim", "petite", "flat")
 THIN_BUCKETS = ("slim", "petite", "flat")
-ADULT_SETTING_MARKERS = ("お姉さん", "人妻", "熟女", "成人", "女上司", "未亡人")
+# Adult-setting words for thin buckets. Not the お姉さん/人妻/熟女 triad alone.
+# オリジナル, 女性, and the adult-face words already used in safety.py count.
+# The R-18 tag does not. Child-coded text still dies in safety.py before this.
+ADULT_SETTING_MARKERS = (
+    "お姉さん",
+    "人妻",
+    "熟女",
+    "成人",
+    "女上司",
+    "未亡人",
+    "オリジナル",
+    "女性",
+    "美人",
+    "美女",
+    "ギャル",
+)
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -102,8 +117,14 @@ def queries_for_buckets(buckets: list[str] | None) -> tuple[tuple[str, str], ...
 
 
 def has_adult_setting(tags: list[str], title: str = "") -> bool:
-    """Adult-setting words. Used so a slim or flat popular page cannot keep child-coded hits."""
+    """True when a thin-bucket page has an adult-setting word.
+
+    safety.py already dropped minors, school, and stated ages under 21.
+    R-18 by itself is not an adult setting.
+    """
     blob = " ".join([title, *tags])
+    if "R-18" in blob or "R18" in blob:
+        blob = blob.replace("R-18", " ").replace("R18", " ")
     if any(marker in blob for marker in ADULT_SETTING_MARKERS):
         return True
     return any(str(tag).strip().upper() == "OL" for tag in tags)
@@ -550,6 +571,8 @@ def row_from_illust_body(body: dict, *, include_ai: bool = False) -> tuple[dict 
     if not has_person_signal(blob, tags):
         return None, "no_person"
     pages = int(body.get("pageCount") or 1)
+    # One to three pages stay. A longer album is the multi_page drop.
+    # Thin buckets use this same cap; they are not dropped for having a second page.
     if pages > MAX_PAGES:
         return None, "multi_page"
     width = int(body.get("width") or 0)

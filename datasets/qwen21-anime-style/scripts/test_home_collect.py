@@ -75,6 +75,10 @@ class HomeCollectTest(unittest.TestCase):
         )
         self.assertEqual(row_from_illust_body(_adult_body(xRestrict=2))[1], "r18g")
         self.assertEqual(row_from_illust_body(_adult_body(aiType=2))[1], "ai_generated")
+        self.assertEqual(row_from_illust_body(_adult_body(pageCount=3))[1], "pass")
+        self.assertIsNotNone(row_from_illust_body(_adult_body(pageCount=2))[0])
+        self.assertEqual(row_from_illust_body(_adult_body(pageCount=4))[1], "multi_page")
+        self.assertIsNone(row_from_illust_body(_adult_body(pageCount=3, title="合法ロリ"))[0])
         kept, why = row_from_illust_body(_adult_body(aiType=2), include_ai=True)
         self.assertEqual(why, "pass", kept)
 
@@ -341,8 +345,14 @@ class FlexibleWindowTest(unittest.TestCase):
         self.assertTrue(any(word == "お姉さん" for _bucket, word in slim))
         self.assertTrue(all(bucket in {"slim", "setting"} for bucket, _word in slim))
         validate_queries([word for _bucket, word in slim])
-        self.assertFalse(thin_bucket_allowed("slim", ["スレンダー", "オリジナル"], "夜"))
+        self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "オリジナル"], "夜"))
         self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "お姉さん"], "夜"))
+        self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "女性"], "夜"))
+        self.assertTrue(thin_bucket_allowed("flat", ["貧乳", "美人"], "夜"))
+        self.assertTrue(thin_bucket_allowed("petite", ["細身", "女上司"], "夜"))
+        self.assertTrue(thin_bucket_allowed("flat", ["ちっぱい", "未亡人"], "夜"))
+        self.assertTrue(thin_bucket_allowed("slim", ["スレンダー", "OL"], "夜"))
+        self.assertFalse(thin_bucket_allowed("slim", ["スレンダー", "R-18"], "夜"))
         self.assertTrue(thin_bucket_allowed("curvy", ["巨乳", "オリジナル"], "夜"))
 
     def test_petite_flat_queries_stay_adult_and_reject_large_chests(self):
