@@ -368,6 +368,12 @@ SIMPLE_SILHOUETTE_EXACT = {
     "セミヌード",
     "ほぼ全裸",
     "半裸",
+    "半脱",
+    "はだけ",
+    "胸はだけ",
+    "服はだけ",
+    "たくしあげ",
+    "着衣ずらし",
     "裸",
     "白背景",
     "背景なし",
@@ -375,7 +381,7 @@ SIMPLE_SILHOUETTE_EXACT = {
     "シンプル背景",
     "単色背景",
 }
-_SIMPLE_SILHOUETTE_PARTS = ("全裸", "ヌード", "白背景", "背景なし", "無背景")
+_SIMPLE_SILHOUETTE_PARTS = ("全裸", "ヌード", "半脱", "はだけ", "たくしあげ", "白背景", "背景なし", "無背景")
 
 
 def _text_blobs(tags: list[str] | str, title: str = "") -> list[str]:
@@ -407,7 +413,11 @@ def is_group_plate(tags: list[str] | str, title: str = "") -> bool:
 
 
 def prefers_simple_silhouette(tags: list[str] | str, title: str = "") -> bool:
-    """True when tags say nude/near-nude or a plain background. Popularity still ranks first."""
+    """True when tags say a readable silhouette or a plain background.
+
+    Full nude is not required. Near-nude and clothes pulled aside count.
+    Popularity still ranks first. This is a tie-break, not a keep rule.
+    """
     for blob in _text_blobs(tags, title):
         if blob in SIMPLE_SILHOUETTE_EXACT:
             return True

@@ -38,7 +38,7 @@ py -3 collect_pixiv_windows.py --mode hot --limit 40 --order popular --min-bookm
 py -3 download_pixiv_originals.py --catalog ../catalog/style_candidates.jsonl --dedicated-profile C:\Users\nopsi\temp\pixiv-collector-chrome --proxy http://127.0.0.1:7890
 ```
 
-`--mode hot` is the popularity pass: R-18, `order=popular_d`, no posting window unless you pass one, bookmark floor 1000, body buckets curvy / average / slim / petite / flat. Prefer a simple adult nude or near-nude. Busy multi-panel tags drop. Child-coded characters still drop. `--quarantine-pixiv-below` on `merge_exports.py` marks older low-bookmark Pixiv rows `visual_review=quarantine`. Failed-review ids are not merged back.
+`--mode hot` is the popularity pass: R-18, `order=popular_d`, no posting window unless you pass one, bookmark floor 1000, body buckets curvy / average / slim / petite / flat. Prefer one commercial color figure with a readable silhouette. Full nude is not required; clothes pulled aside stay when the body line is clear. Busy multi-panel tags drop. Child-coded characters still drop. `--quarantine-pixiv-below` on `merge_exports.py` marks older low-bookmark Pixiv rows `visual_review=quarantine`. Failed-review ids are not merged back.
 
 `--self-check` only validates the adult search words. On Linux or macOS both scripts exit without opening a browser.
 

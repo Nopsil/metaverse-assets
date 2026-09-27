@@ -383,7 +383,7 @@ def _finish_hot_rows(rows, stubs, args, dropped: Counter, notes: dict) -> list[d
             row["quality"] = stub_count
         window = f"{args.start_date}..{args.end_date}" if dated else "no date window"
         simple = prefers_simple_silhouette(row.get("tags") or [], str(row.get("title") or ""))
-        silhouette = " Tags suggest a simple nude or near-nude figure." if simple else ""
+        silhouette = " Tags suggest a readable silhouette (nude, near-nude, or clothes pulled aside)." if simple else ""
         row["keep_reason"] = (
             f"Popular R-18 search {window} "
             f"({row.get('body_bucket')}, {row.get('bookmark_count')} bookmarks). "

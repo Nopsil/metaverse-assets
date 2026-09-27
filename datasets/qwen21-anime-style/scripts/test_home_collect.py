@@ -429,6 +429,8 @@ class HotSearchTest(unittest.TestCase):
         self.assertTrue(is_rough_work(["下絵", "お姉さん"], ""))
         self.assertTrue(is_rough_work(["お姉さん"], "WIP"))
         self.assertTrue(prefers_simple_silhouette(["全裸", "白背景"], ""))
+        self.assertTrue(prefers_simple_silhouette(["半脱", "お姉さん"], ""))
+        self.assertTrue(prefers_simple_silhouette(["たくしあげ"], "胸はだけ"))
         self.assertFalse(prefers_simple_silhouette(["裸足", "お姉さん"], ""))
         rows = [
             {"id": "1", "body_bucket": "average", "bookmark_count": 1000, "user_id": "a", "tags": ["お姉さん"]},

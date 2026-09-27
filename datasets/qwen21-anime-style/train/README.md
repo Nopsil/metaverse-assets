@@ -53,7 +53,7 @@ py -3 download_pixiv_originals.py --catalog ../catalog/_pixiv_hot_export.jsonl -
 
 New Pixiv files land in gitignored `catalog/_originals_hot/`. The previous originals under `catalog/quarantine/poor-aesthetic-20260927/_originals/` and `catalog/_originals/` are train-unready and are not staged. Put Civitai full-size files in gitignored `catalog/_originals_civitai/`. Put anatomy stills in gitignored `catalog/_originals_anatomy/`. Thumbs (`square1200`, `master1200`) are not training files.
 
-Review every file at full size. Delete a file when the series, character, or setting is child-coded, or when the frame is a busy multi-panel or cluttered scene. Keep a clean adult nude or near-nude whose silhouette is the subject. Do not commit images, cookies, or the Chrome profile.
+Review every file at full size. Delete a file when the series, character, or setting is child-coded, or when the frame is a busy multi-panel or cluttered scene. Keep a clean commercial color plate whose silhouette is the subject. Full nude is not required; clothes pulled aside stay when the body line is clear. Do not commit images, cookies, or the Chrome profile.
 
 ### 2. Stage folders (Windows or Linux)
 
